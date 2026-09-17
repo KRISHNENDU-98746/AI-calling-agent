@@ -35,6 +35,7 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json({ limit: '100kb' }));
 
+// Register API routes before the 404 handler.
 app.use(healthRouter);
 app.use(twilioRouter);
 
@@ -57,9 +58,10 @@ const wss = new WebSocketServer({
 attachMediaStreamServer(wss);
 
 const envStatus = validateEnv({ strict: false });
+const port = Number(process.env.PORT) || env.port || 3000;
 
-server.listen(env.port, '0.0.0.0', () => {
-  console.log(`[server] Appointment Voice Agent listening on port ${env.port}`);
+server.listen(port, '0.0.0.0', () => {
+  console.log(`[server] Appointment Voice Agent listening on port ${port}`);
   console.log(`[server] Health check: GET /health`);
   console.log(`[server] Twilio voice webhook: POST /voice`);
   console.log(`[server] Media stream WebSocket: /media-stream`);

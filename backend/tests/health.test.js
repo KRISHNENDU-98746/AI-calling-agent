@@ -67,7 +67,7 @@ describe('Appointment Voice Agent backend', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(JSON.parse(res.body), {
       status: 'ok',
-      service: 'appointment-voice-agent',
+      service: 'ai-appointment-agent',
     });
   });
 
