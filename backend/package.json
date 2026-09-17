@@ -1,0 +1,32 @@
+{
+  "name": "appointment-voice-agent-backend",
+  "version": "1.0.0",
+  "description": "Inbound rule-based voice appointment agent for clinics (Twilio + Sarvam + Firestore)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "twilio",
+    "sarvam",
+    "voice-agent",
+    "appointments"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "firebase-admin": "^13.0.2",
+    "helmet": "^8.0.0",
+    "twilio": "^5.4.2",
+    "ws": "^8.18.0"
+  }
+}
