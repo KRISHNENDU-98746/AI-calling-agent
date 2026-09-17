@@ -40,6 +40,23 @@ const env = {
     validateRequests: toBool(process.env.TWILIO_VALIDATE_REQUESTS, false),
   },
 
+  exotel: {
+    sid: process.env.EXOTEL_SID || '',
+    apiKey: process.env.EXOTEL_API_KEY || '',
+    apiToken: process.env.EXOTEL_API_TOKEN || '',
+    phoneNumber: process.env.EXOTEL_PHONE_NUMBER || '',
+    sampleRate: Number(process.env.EXOTEL_SAMPLE_RATE) || 8000,
+  },
+
+  // Portal/API values for Edesy Voice Platform (inbound WS does not require these to accept audio).
+  edesy: {
+    accountSid: process.env.EDESY_ACCOUNT_SID || '',
+    apiKey: process.env.EDESY_API_KEY || '',
+    applicationSid: process.env.EDESY_APPLICATION_SID || '',
+    fromNumber: process.env.EDESY_FROM_NUMBER || '',
+    sampleRate: Number(process.env.EDESY_SAMPLE_RATE) || 16000,
+  },
+
   sarvam: {
     apiKey: process.env.SARVAM_API_KEY || '',
     baseUrl: 'https://api.sarvam.ai',
@@ -89,7 +106,7 @@ function validateEnv({ strict = false } = {}) {
 
   if (!env.publicBaseUrl && env.nodeEnv === 'production') {
     console.warn(
-      '[env] PUBLIC_BASE_URL is not set. Twilio Media Streams will fall back to the request Host header.'
+      '[env] PUBLIC_BASE_URL is not set. Media Streams will fall back to the request Host header.'
     );
   }
 

@@ -87,6 +87,31 @@ describe('Appointment Voice Agent backend', () => {
     assert.match(res.body, /\/media-stream/i);
   });
 
+  it('POST /exotel returns Exotel Voicebot WSS url JSON', async () => {
+    const port = await listen();
+    const res = await request(
+      port,
+      'POST',
+      '/exotel',
+      'CallSid=EXOTELTEST&From=%2B919999999999&To=%2B919513886363'
+    );
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'] || '', /json/i);
+    const payload = JSON.parse(res.body);
+    assert.equal(typeof payload.url, 'string');
+    assert.match(payload.url, /^wss:\/\//i);
+    assert.match(payload.url, /\/exotel-media-stream/i);
+  });
+
+  it('GET /exotel returns Exotel Voicebot WSS url JSON', async () => {
+    const port = await listen();
+    const res = await request(port, 'GET', '/exotel?CallSid=EXOTELGET&From=%2B919999999999');
+    assert.equal(res.status, 200);
+    const payload = JSON.parse(res.body);
+    assert.match(payload.url, /\/exotel-media-stream/i);
+  });
+
   it('WebSocket /media-stream survives client disconnect', async () => {
     const port = await listen();
 
@@ -98,6 +123,46 @@ describe('Appointment Voice Agent backend', () => {
 
       ws.on('open', () => {
         ws.send(JSON.stringify({ event: 'connected', protocol: 'Call', version: '1.0.0' }));
+        ws.close();
+      });
+
+      ws.on('close', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+
+      ws.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const res = await request(port, 'GET', '/health');
+    assert.equal(res.status, 200);
+  });
+
+  it('WebSocket /ws accepts Edesy metadata frame then disconnect', async () => {
+    const port = await listen();
+
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+      const timer = setTimeout(() => {
+        reject(new Error('Edesy WebSocket connect timed out'));
+      }, 5000);
+
+      ws.on('open', () => {
+        ws.send(
+          JSON.stringify({
+            call_sid: 'test-call-sid',
+            callSid: 'test-call-sid',
+            direction: 'inbound',
+            from: '919876543210',
+            to: '917969002802',
+            sampleRate: 16000,
+            mixType: 'mono',
+            call_status: 'in-progress',
+          })
+        );
         ws.close();
       });
 

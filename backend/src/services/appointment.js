@@ -14,6 +14,7 @@ async function saveAppointmentRequest(data) {
     language = null,
     conversationId,
     callSid = null,
+    source = 'voice_agent',
   } = data;
 
   if (!patientName || !doctorName || !preferredDate || !preferredTime) {
@@ -32,7 +33,7 @@ async function saveAppointmentRequest(data) {
     status: 'requested',
     language,
     createdAt: new Date().toISOString(),
-    source: 'voice_agent',
+    source,
     conversationId: conversationId || docRef.id,
     callSid,
   };
