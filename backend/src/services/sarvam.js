@@ -115,9 +115,35 @@ async function textToSpeech(text, options = {}) {
 /**
  * Open Sarvam realtime STT WebSocket (saaras:v3-realtime).
  * Compatible with Twilio Media Streams: encoding=mulaw, sample_rate=8000.
+ * Exotel/Edesy PCM: encoding=linear16 (raw signed 16-bit LE), sample_rate=8000|16000.
  *
  * Docs: https://docs.sarvam.ai/api/api-guides-tutorials/speech-to-text/realtime-streaming
+ * Realtime encoding enum: linear16 | linear32 | mulaw | alaw (NOT legacy pcm_s16le).
  */
+const REALTIME_ENCODING_ALIASES = {
+  linear16: 'linear16',
+  linear32: 'linear32',
+  mulaw: 'mulaw',
+  alaw: 'alaw',
+  // Legacy Streaming API codec names → realtime equivalents
+  pcm_s16le: 'linear16',
+  pcm_l16: 'linear16',
+  pcm_raw: 'linear16',
+  s16le: 'linear16',
+  slin: 'linear16',
+};
+
+function normalizeRealtimeEncoding(encoding) {
+  const key = String(encoding || 'linear16').toLowerCase().trim();
+  const normalized = REALTIME_ENCODING_ALIASES[key];
+  if (!normalized) {
+    throw new Error(
+      `Unsupported Sarvam realtime STT encoding "${encoding}". Use linear16, linear32, mulaw, or alaw.`
+    );
+  }
+  return normalized;
+}
+
 function createRealtimeSttConnection(options = {}) {
   requireApiKey();
 
@@ -134,20 +160,26 @@ function createRealtimeSttConnection(options = {}) {
     minSpeechDurationMs = 250,
   } = options;
 
+  const normalizedEncoding = normalizeRealtimeEncoding(encoding);
+  const normalizedSampleRate = Number(sampleRate) === 16000 ? 16000 : 8000;
+
   const params = new URLSearchParams({
     language_code: languageCode,
     model,
     mode,
     stream_type: streamType,
     endpointing,
-    encoding,
-    sample_rate: String(sampleRate),
+    encoding: normalizedEncoding,
+    sample_rate: String(normalizedSampleRate),
     silence_duration_ms: String(silenceDurationMs),
     threshold: String(threshold),
     min_speech_duration_ms: String(minSpeechDurationMs),
   });
 
   const url = `wss://api.sarvam.ai/speech-to-text-realtime/ws?${params.toString()}`;
+  console.log(
+    `[sarvam] STT connect model=${model} language=${languageCode} mode=${mode} encoding=${normalizedEncoding} sample_rate=${normalizedSampleRate} stream_type=${streamType}`
+  );
 
   const ws = new WebSocket(url, {
     headers: {
@@ -157,6 +189,8 @@ function createRealtimeSttConnection(options = {}) {
 
   return {
     ws,
+    encoding: normalizedEncoding,
+    sampleRate: normalizedSampleRate,
     sendAudioBase64(base64Audio) {
       if (ws.readyState !== WebSocket.OPEN) return;
       ws.send(
@@ -200,5 +234,6 @@ module.exports = {
   speechToText,
   textToSpeech,
   createRealtimeSttConnection,
+  normalizeRealtimeEncoding,
   synthesizeFallbackSpeech,
 };

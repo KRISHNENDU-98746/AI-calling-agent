@@ -243,7 +243,7 @@ function attachEdesyMediaStreamServer(wss) {
         stt = createRealtimeSttConnection({
           languageCode: env.sarvam.sttLanguage || 'auto',
           mode: env.sarvam.sttMode || 'codemix',
-          encoding: 'pcm_s16le',
+          encoding: 'linear16',
           sampleRate,
           streamType: 'fast',
           silenceDurationMs: 800,

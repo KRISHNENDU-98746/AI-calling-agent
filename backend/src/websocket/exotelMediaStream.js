@@ -257,8 +257,8 @@ function attachExotelMediaStreamServer(wss) {
         stt = createRealtimeSttConnection({
           languageCode: env.sarvam.sttLanguage || 'auto',
           mode: env.sarvam.sttMode || 'codemix',
-          // Exotel sends 16-bit LE PCM (raw/slin)
-          encoding: 'pcm_s16le',
+          // Exotel Voicebot: raw/slin = signed 16-bit LE PCM → Sarvam realtime "linear16"
+          encoding: 'linear16',
           sampleRate,
           streamType: 'fast',
           silenceDurationMs: 800,
@@ -304,7 +304,7 @@ function attachExotelMediaStreamServer(wss) {
           console.error(
             `[EXOTEL] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
               message.is_fatal
-            )}`
+            )} message=${message.message || message.error || JSON.stringify(message)}`
           );
           if (message.is_fatal) {
             speakText(FALLBACK_SPEECH, 'en-IN');

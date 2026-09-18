@@ -245,3 +245,13 @@ describe('env private key normalization', () => {
     assert.match(env.firebase.privateKey, /BEGIN PRIVATE KEY-----\nABC\n-----END/);
   });
 });
+
+describe('Sarvam realtime STT encoding', () => {
+  it('maps legacy pcm_s16le to linear16 for realtime API', () => {
+    const { normalizeRealtimeEncoding } = require('../src/services/sarvam');
+    assert.equal(normalizeRealtimeEncoding('pcm_s16le'), 'linear16');
+    assert.equal(normalizeRealtimeEncoding('linear16'), 'linear16');
+    assert.equal(normalizeRealtimeEncoding('mulaw'), 'mulaw');
+    assert.equal(normalizeRealtimeEncoding('slin'), 'linear16');
+  });
+});
