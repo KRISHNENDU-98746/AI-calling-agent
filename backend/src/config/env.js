@@ -79,9 +79,8 @@ const env = {
   },
 };
 
+// Shared requirements for Exotel and Twilio live call paths.
 const CRITICAL_FOR_CALLS = [
-  ['TWILIO_ACCOUNT_SID', env.twilio.accountSid],
-  ['TWILIO_AUTH_TOKEN', env.twilio.authToken],
   ['SARVAM_API_KEY', env.sarvam.apiKey],
   ['FIREBASE_PROJECT_ID', env.firebase.projectId],
   ['FIREBASE_CLIENT_EMAIL', env.firebase.clientEmail],
@@ -102,6 +101,18 @@ function validateEnv({ strict = false } = {}) {
       throw new Error(message);
     }
     console.warn(`[env] ${message}`);
+  }
+
+  const hasTwilio = Boolean(env.twilio.accountSid && env.twilio.authToken);
+  if (!hasTwilio && env.nodeEnv === 'production') {
+    console.warn(
+      '[env] TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN not set. Twilio /voice will not authenticate live calls; Exotel path remains available.'
+    );
+  }
+  if (!env.exotel.phoneNumber) {
+    console.warn(
+      '[env] EXOTEL_PHONE_NUMBER is not set (optional metadata only; Voicebot webhook still works).'
+    );
   }
 
   if (!env.publicBaseUrl && env.nodeEnv === 'production') {

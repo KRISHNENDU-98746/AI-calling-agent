@@ -83,7 +83,7 @@ function attachExotelMediaStreamServer(wss) {
     const sampleRate = parseSampleRate(req?.url || '');
 
     console.log(
-      `[exotel-media] Client connected conversationId=${conversationId} sampleRate=${sampleRate}`
+      `[EXOTEL] Call connected conversationId=${conversationId} sampleRate=${sampleRate}`
     );
 
     const safeSend = (payload) => {
@@ -91,7 +91,7 @@ function attachExotelMediaStreamServer(wss) {
       try {
         exotelWs.send(JSON.stringify(payload));
       } catch (error) {
-        console.error('[exotel-media] Failed to send to Exotel:', error.message);
+        console.error('[EXOTEL] Failed to send to Exotel:', error.message);
       }
     };
 
@@ -138,18 +138,22 @@ function attachExotelMediaStreamServer(wss) {
           speechSampleRate: sampleRate,
           outputAudioCodec: 'linear16',
         });
+        console.log(
+          `[EXOTEL] TTS generated conversationId=${conversationId} bytes=${result.audioBuffer.length} lang=${languageCode}`
+        );
         sendPcmChunksToExotel(stripWavHeaderIfPresent(result.audioBuffer));
       } catch (error) {
-        console.error('[exotel-media] TTS failed:', error.message);
+        console.error('[EXOTEL] TTS failed:', error.message);
         try {
           const fallback = await textToSpeech(FALLBACK_SPEECH, {
             languageCode: 'en-IN',
             speechSampleRate: sampleRate,
             outputAudioCodec: 'linear16',
           });
+          console.log('[EXOTEL] TTS generated (fallback)');
           sendPcmChunksToExotel(stripWavHeaderIfPresent(fallback.audioBuffer));
         } catch (fallbackError) {
-          console.error('[exotel-media] Fallback TTS failed:', fallbackError.message);
+          console.error('[EXOTEL] Fallback TTS failed:', fallbackError.message);
         }
       }
     };
@@ -173,7 +177,7 @@ function attachExotelMediaStreamServer(wss) {
         stt = null;
       }
 
-      console.log(`[exotel-media] Closed conversationId=${conversationId}`);
+      console.log(`[EXOTEL] Call closed conversationId=${conversationId}`);
     };
 
     const handleFinalTranscript = async (transcript, detectedLanguage) => {
@@ -184,6 +188,8 @@ function attachExotelMediaStreamServer(wss) {
       clearExotelBuffer();
 
       try {
+        console.log(`[EXOTEL] Transcript: ${text}`);
+
         if (detectedLanguage) {
           ttsLanguage = mapLanguageForTts(detectedLanguage);
         }
@@ -212,6 +218,12 @@ function attachExotelMediaStreamServer(wss) {
           ttsLanguage = mapLanguageForTts(turn.detectedLanguage);
         }
 
+        console.log(
+          `[EXOTEL] Agent response generated step=${conversationStep} ready=${Boolean(
+            turn.appointmentReady
+          )}`
+        );
+
         if (turn.appointmentReady && !appointmentSaved) {
           try {
             await saveAppointmentRequest({
@@ -223,11 +235,11 @@ function attachExotelMediaStreamServer(wss) {
             });
             appointmentSaved = true;
             console.log(
-              `[exotel-media] Appointment request saved conversationId=${conversationId}`
+              `[EXOTEL] Appointment request saved conversationId=${conversationId}`
             );
             await speakText(turn.response, ttsLanguage);
           } catch (error) {
-            console.error('[exotel-media] Firestore save failed:', error.message);
+            console.error('[EXOTEL] Firestore save failed:', error.message);
             conversationStep = STEPS.CONFIRM;
             await speakText(getSaveFailedMessage(ttsLanguage), ttsLanguage);
           }
@@ -252,13 +264,13 @@ function attachExotelMediaStreamServer(wss) {
           silenceDurationMs: 800,
         });
       } catch (error) {
-        console.error('[exotel-media] STT connection setup failed:', error.message);
+        console.error('[EXOTEL] STT connection setup failed:', error.message);
         speakText(FALLBACK_SPEECH, 'en-IN');
         return;
       }
 
       stt.ws.on('open', () => {
-        console.log(`[exotel-media] Sarvam STT connected conversationId=${conversationId}`);
+        console.log(`[EXOTEL] Sarvam STT connected conversationId=${conversationId}`);
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
         }, 20000);
@@ -283,14 +295,14 @@ function attachExotelMediaStreamServer(wss) {
           const transcript = message.text || message.transcript || '';
           const detectedLanguage = message.language || message.language_code || null;
           handleFinalTranscript(transcript, detectedLanguage).catch((error) => {
-            console.error('[exotel-media] Turn handling failed:', error.message);
+            console.error('[EXOTEL] Turn handling failed:', error.message);
           });
           return;
         }
 
         if (eventName === 'error') {
           console.error(
-            `[exotel-media] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
+            `[EXOTEL] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
               message.is_fatal
             )}`
           );
@@ -301,13 +313,15 @@ function attachExotelMediaStreamServer(wss) {
       });
 
       stt.ws.on('error', (error) => {
-        console.error('[exotel-media] Sarvam STT socket error:', error.message);
+        console.error('[EXOTEL] Sarvam STT socket error:', error.message);
       });
 
       stt.ws.on('close', () => {
-        console.log(`[exotel-media] Sarvam STT closed conversationId=${conversationId}`);
+        console.log(`[EXOTEL] Sarvam STT closed conversationId=${conversationId}`);
       });
     };
+
+    let audioStreamLogged = false;
 
     exotelWs.on('message', async (raw) => {
       let msg;
@@ -319,6 +333,7 @@ function attachExotelMediaStreamServer(wss) {
 
       switch (msg.event) {
         case 'connected':
+          console.log(`[EXOTEL] Protocol connected conversationId=${conversationId}`);
           break;
 
         case 'start': {
@@ -327,7 +342,7 @@ function attachExotelMediaStreamServer(wss) {
           callerPhone = msg.start?.from || msg.start?.custom_parameters?.from || null;
 
           console.log(
-            `[exotel-media] Stream started streamSid=${streamSid || 'unknown'} callSid=${
+            `[EXOTEL] Audio stream connected streamSid=${streamSid || 'unknown'} callSid=${
               callSid || 'unknown'
             } from=${callerPhone || 'unknown'}`
           );
@@ -346,6 +361,10 @@ function attachExotelMediaStreamServer(wss) {
         }
 
         case 'media': {
+          if (!audioStreamLogged && msg.media?.payload) {
+            audioStreamLogged = true;
+            console.log(`[EXOTEL] Audio stream receiving media conversationId=${conversationId}`);
+          }
           if (stt && msg.media?.payload) {
             stt.sendAudioBase64(msg.media.payload);
           }
@@ -354,7 +373,7 @@ function attachExotelMediaStreamServer(wss) {
 
         case 'dtmf':
           console.log(
-            `[exotel-media] DTMF digit=${msg.dtmf?.digit || 'unknown'} conversationId=${conversationId}`
+            `[EXOTEL] DTMF digit=${msg.dtmf?.digit || 'unknown'} conversationId=${conversationId}`
           );
           break;
 
@@ -375,13 +394,13 @@ function attachExotelMediaStreamServer(wss) {
     });
 
     exotelWs.on('error', (error) => {
-      console.error('[exotel-media] Exotel socket error:', error.message);
+      console.error('[EXOTEL] Exotel socket error:', error.message);
       cleanup();
     });
   });
 
   wss.on('error', (error) => {
-    console.error('[exotel-media] WebSocket server error:', error.message);
+    console.error('[EXOTEL] WebSocket server error:', error.message);
   });
 }
 

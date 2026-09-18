@@ -65,10 +65,15 @@ describe('Appointment Voice Agent backend', () => {
     const port = await listen();
     const res = await request(port, 'GET', '/health');
     assert.equal(res.status, 200);
-    assert.deepEqual(JSON.parse(res.body), {
-      status: 'ok',
-      service: 'ai-appointment-agent',
-    });
+    const payload = JSON.parse(res.body);
+    assert.equal(payload.status, 'ok');
+    assert.equal(payload.service, 'ai-appointment-agent');
+    assert.equal(payload.endpoints.exotel, '/exotel');
+    assert.equal(payload.endpoints.exotelMediaStream, '/exotel-media-stream');
+    assert.equal(payload.endpoints.voice, '/voice');
+    assert.equal(payload.endpoints.mediaStream, '/media-stream');
+    assert.equal(typeof payload.config.sarvamConfigured, 'boolean');
+    assert.equal(typeof payload.config.firebaseConfigured, 'boolean');
   });
 
   it('POST /voice returns valid TwiML with Media Stream', async () => {
@@ -110,6 +115,55 @@ describe('Appointment Voice Agent backend', () => {
     assert.equal(res.status, 200);
     const payload = JSON.parse(res.body);
     assert.match(payload.url, /\/exotel-media-stream/i);
+  });
+
+  it('WebSocket /exotel-media-stream accepts connected+start then disconnect', async () => {
+    const port = await listen();
+
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/exotel-media-stream?sample-rate=8000`);
+      const timer = setTimeout(() => {
+        reject(new Error('Exotel WebSocket connect timed out'));
+      }, 5000);
+
+      ws.on('open', () => {
+        ws.send(
+          JSON.stringify({
+            event: 'connected',
+            protocol: 'Call',
+            version: '1.0.0',
+          })
+        );
+        ws.send(
+          JSON.stringify({
+            event: 'start',
+            sequence_number: '1',
+            stream_sid: 'MZ_TEST_STREAM',
+            start: {
+              stream_sid: 'MZ_TEST_STREAM',
+              call_sid: 'EXOTEL_TEST_CALL',
+              from: '+919999999999',
+              to: '+919513886363',
+              custom_parameters: {},
+            },
+          })
+        );
+        setTimeout(() => ws.close(), 200);
+      });
+
+      ws.on('close', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+
+      ws.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const res = await request(port, 'GET', '/health');
+    assert.equal(res.status, 200);
   });
 
   it('WebSocket /media-stream survives client disconnect', async () => {

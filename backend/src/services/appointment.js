@@ -27,6 +27,7 @@ async function saveAppointmentRequest(data) {
   const appointment = {
     patientName,
     phoneNumber,
+    callerNumber: phoneNumber,
     doctorName,
     preferredDate,
     preferredTime,

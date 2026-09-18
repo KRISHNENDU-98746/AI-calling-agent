@@ -49,18 +49,21 @@ function handleExotelWebhook(req, res) {
   try {
     const meta = extractCallMeta(req);
     console.log(
-      `[exotel] Voicebot URL resolve method=${req.method} callSid=${meta.callSid || 'unknown'} from=${
+      `[EXOTEL] Incoming call received method=${req.method} callSid=${meta.callSid || 'unknown'} from=${
         meta.from || 'unknown'
-      }`
+      } to=${meta.to || 'unknown'}`
     );
 
     const streamUrl = buildExotelStreamUrl(req);
+    // Never log embedded credentials if Basic Auth is present in the WSS URL.
+    const safeStreamUrl = streamUrl.replace(/\/\/([^/@]+):([^/@]+)@/, '//***:***@');
+    console.log(`[EXOTEL] Voicebot WSS URL resolved url=${safeStreamUrl}`);
 
     res.status(200).type('application/json').json({
       url: streamUrl,
     });
   } catch (error) {
-    console.error('[exotel] /exotel failed:', error.message);
+    console.error('[EXOTEL] /exotel failed:', error.message);
     res.status(500).type('application/json').json({
       error: 'Failed to resolve Exotel media stream URL',
     });
