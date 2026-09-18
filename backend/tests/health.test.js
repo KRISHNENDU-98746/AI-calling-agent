@@ -117,14 +117,15 @@ describe('Appointment Voice Agent backend', () => {
     assert.match(payload.url, /\/exotel-media-stream/i);
   });
 
-  it('WebSocket /exotel-media-stream accepts connected+start then disconnect', async () => {
+  it('WebSocket /exotel-media-stream stays open after start (no server hangup)', async () => {
     const port = await listen();
 
     await new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/exotel-media-stream?sample-rate=8000`);
       const timer = setTimeout(() => {
         reject(new Error('Exotel WebSocket connect timed out'));
-      }, 5000);
+      }, 8000);
+      let closedEarly = false;
 
       ws.on('open', () => {
         ws.send(
@@ -148,11 +149,22 @@ describe('Appointment Voice Agent backend', () => {
             },
           })
         );
-        setTimeout(() => ws.close(), 200);
+
+        // Server must NOT close the socket on its own after start/greeting attempt.
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+            return;
+          }
+          closedEarly = true;
+          clearTimeout(timer);
+          reject(new Error('Exotel WebSocket closed by server before client hangup'));
+        }, 1200);
       });
 
       ws.on('close', () => {
         clearTimeout(timer);
+        if (closedEarly) return;
         resolve();
       });
 

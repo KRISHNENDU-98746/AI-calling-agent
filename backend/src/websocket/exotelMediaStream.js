@@ -25,9 +25,15 @@ const LANGUAGE_TO_TTS = {
   mixed: 'en-IN',
 };
 
-// Exotel bidirectional media must be chunked in multiples of 320 bytes.
-// 3200 bytes = 100ms of 16-bit mono @ 8kHz (docs minimum window).
-const EXOTEL_CHUNK_BYTES = 3200;
+// Exotel expects 16-bit mono PCM in multiples of 320 bytes.
+// Official AgentStream guide: pace ~320 B / 20 ms (do not burst the whole utterance).
+const EXOTEL_FRAME_BYTES = 320;
+const EXOTEL_BURST_FRAMES = 8; // 8 × 20 ms = 160 ms between awaits
+const EXOTEL_FRAME_MS = 20;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function mapLanguageForTts(detectedLanguage) {
   if (!detectedLanguage) return env.sarvam.ttsLanguage;
@@ -81,17 +87,22 @@ function attachExotelMediaStreamServer(wss) {
     let appointmentData = { ...EMPTY_APPOINTMENT };
     let ttsLanguage = env.sarvam.ttsLanguage;
     const sampleRate = parseSampleRate(req?.url || '');
+    let streamStartedAt = Date.now();
+    let speakGeneration = 0;
+    let botSpeaking = false;
 
     console.log(
       `[EXOTEL] Call connected conversationId=${conversationId} sampleRate=${sampleRate}`
     );
 
     const safeSend = (payload) => {
-      if (closed || exotelWs.readyState !== WebSocket.OPEN) return;
+      if (closed || exotelWs.readyState !== WebSocket.OPEN) return false;
       try {
         exotelWs.send(JSON.stringify(payload));
+        return true;
       } catch (error) {
         console.error('[EXOTEL] Failed to send to Exotel:', error.message);
+        return false;
       }
     };
 
@@ -100,67 +111,119 @@ function attachExotelMediaStreamServer(wss) {
       safeSend({ event: 'clear', stream_sid: streamSid });
     };
 
-    const sendPcmChunksToExotel = (pcmBuffer) => {
-      if (!streamSid || !pcmBuffer || !pcmBuffer.length) return;
+    /**
+     * Pace PCM to Exotel (~320 bytes / 20 ms). Bursting the full TTS payload
+     * can make Exotel drop the Voicebot WebSocket after the first reply.
+     */
+    const sendPcmChunksToExotel = async (pcmBuffer, generation) => {
+      if (!streamSid || !pcmBuffer || !pcmBuffer.length) return false;
 
       let offset = 0;
+      let framesInBurst = 0;
+
       while (offset < pcmBuffer.length) {
-        let end = Math.min(offset + EXOTEL_CHUNK_BYTES, pcmBuffer.length);
+        if (closed || generation !== speakGeneration) return false;
+        if (exotelWs.readyState !== WebSocket.OPEN) return false;
+
+        let end = Math.min(offset + EXOTEL_FRAME_BYTES, pcmBuffer.length);
         let slice = pcmBuffer.subarray(offset, end);
 
-        // Pad final short chunk up to a multiple of 320 bytes with silence.
-        const remainder = slice.length % 320;
+        const remainder = slice.length % EXOTEL_FRAME_BYTES;
         if (remainder !== 0) {
-          const padded = Buffer.alloc(slice.length + (320 - remainder), 0);
+          const padded = Buffer.alloc(slice.length + (EXOTEL_FRAME_BYTES - remainder), 0);
           slice.copy(padded);
           slice = padded;
         }
 
-        safeSend({
+        const timestamp = String(Math.max(0, Date.now() - streamStartedAt));
+        const ok = safeSend({
           event: 'media',
           sequence_number: String(mediaSequence++),
           stream_sid: streamSid,
           media: {
-            chunk: mediaChunk++,
-            timestamp: String(Date.now()),
+            chunk: String(mediaChunk++),
+            timestamp,
             payload: slice.toString('base64'),
           },
         });
+        if (!ok) return false;
 
         offset = end;
+        framesInBurst += 1;
+        if (framesInBurst >= EXOTEL_BURST_FRAMES) {
+          framesInBurst = 0;
+          await sleep(EXOTEL_FRAME_MS);
+        }
       }
+
+      if (closed || generation !== speakGeneration) return false;
+
+      // Ask Exotel to ACK when this utterance has been played.
+      safeSend({
+        event: 'mark',
+        sequence_number: String(mediaSequence++),
+        stream_sid: streamSid,
+        mark: { name: `tts_${generation}` },
+      });
+      return true;
     };
 
     const speakText = async (text, languageCode = ttsLanguage) => {
+      const generation = ++speakGeneration;
+      botSpeaking = true;
+      // Stop any queued playback from a previous (e.g. overlapping greeting) turn.
+      clearExotelBuffer();
+
       try {
         const result = await textToSpeech(text, {
           languageCode,
           speechSampleRate: sampleRate,
           outputAudioCodec: 'linear16',
         });
+        if (closed || generation !== speakGeneration) return;
+
         console.log(
           `[EXOTEL] TTS generated conversationId=${conversationId} bytes=${result.audioBuffer.length} lang=${languageCode}`
         );
-        sendPcmChunksToExotel(stripWavHeaderIfPresent(result.audioBuffer));
+        const sent = await sendPcmChunksToExotel(
+          stripWavHeaderIfPresent(result.audioBuffer),
+          generation
+        );
+        if (sent) {
+          console.log(
+            `[EXOTEL] TTS playback queued conversationId=${conversationId} generation=${generation}`
+          );
+        }
       } catch (error) {
         console.error('[EXOTEL] TTS failed:', error.message);
+        if (closed || generation !== speakGeneration) return;
         try {
           const fallback = await textToSpeech(FALLBACK_SPEECH, {
             languageCode: 'en-IN',
             speechSampleRate: sampleRate,
             outputAudioCodec: 'linear16',
           });
+          if (closed || generation !== speakGeneration) return;
           console.log('[EXOTEL] TTS generated (fallback)');
-          sendPcmChunksToExotel(stripWavHeaderIfPresent(fallback.audioBuffer));
+          await sendPcmChunksToExotel(
+            stripWavHeaderIfPresent(fallback.audioBuffer),
+            generation
+          );
         } catch (fallbackError) {
           console.error('[EXOTEL] Fallback TTS failed:', fallbackError.message);
+        }
+      } finally {
+        if (generation === speakGeneration) {
+          botSpeaking = false;
         }
       }
     };
 
-    const cleanup = () => {
+    const cleanup = (reason = 'unknown') => {
       if (closed) return;
       closed = true;
+      speakGeneration += 1;
+      botSpeaking = false;
 
       if (pingTimer) {
         clearInterval(pingTimer);
@@ -177,15 +240,15 @@ function attachExotelMediaStreamServer(wss) {
         stt = null;
       }
 
-      console.log(`[EXOTEL] Call closed conversationId=${conversationId}`);
+      console.log(`[EXOTEL] Call closed conversationId=${conversationId} reason=${reason}`);
     };
 
     const handleFinalTranscript = async (transcript, detectedLanguage) => {
       const text = (transcript || '').trim();
-      if (!text || processingTurn || appointmentSaved) return;
+      // Ignore STT while we are talking — telephony echo often re-transcribes TTS.
+      if (!text || processingTurn || appointmentSaved || botSpeaking || closed) return;
 
       processingTurn = true;
-      clearExotelBuffer();
 
       try {
         console.log(`[EXOTEL] Transcript: ${text}`);
@@ -287,7 +350,7 @@ function attachExotelMediaStreamServer(wss) {
         const eventName = message.event || message.type;
 
         if (eventName === 'vad.speech_start') {
-          clearExotelBuffer();
+          // Inbound audio is muted while botSpeaking, so ignore VAD here.
           return;
         }
 
@@ -340,6 +403,7 @@ function attachExotelMediaStreamServer(wss) {
           streamSid = msg.start?.stream_sid || msg.stream_sid || null;
           callSid = msg.start?.call_sid || null;
           callerPhone = msg.start?.from || msg.start?.custom_parameters?.from || null;
+          streamStartedAt = Date.now();
 
           console.log(
             `[EXOTEL] Audio stream connected streamSid=${streamSid || 'unknown'} callSid=${
@@ -354,7 +418,7 @@ function attachExotelMediaStreamServer(wss) {
             conversationStep = STEPS.ASK_NAME;
             const greeting = getGreetingMessage(env.clinic.name, ttsLanguage);
             setTimeout(() => {
-              speakText(greeting, ttsLanguage);
+              if (!closed) speakText(greeting, ttsLanguage);
             }, 300);
           }
           break;
@@ -365,7 +429,8 @@ function attachExotelMediaStreamServer(wss) {
             audioStreamLogged = true;
             console.log(`[EXOTEL] Audio stream receiving media conversationId=${conversationId}`);
           }
-          if (stt && msg.media?.payload) {
+          // Do not feed bot playback echo into STT while speaking.
+          if (stt && msg.media?.payload && !botSpeaking) {
             stt.sendAudioBase64(msg.media.payload);
           }
           break;
@@ -378,10 +443,13 @@ function attachExotelMediaStreamServer(wss) {
           break;
 
         case 'mark':
+          console.log(
+            `[EXOTEL] Mark received name=${msg.mark?.name || 'unknown'} conversationId=${conversationId}`
+          );
           break;
 
         case 'stop':
-          cleanup();
+          cleanup(`exotel_stop:${msg.stop?.reason || msg.reason || 'stopped'}`);
           break;
 
         default:
@@ -389,13 +457,14 @@ function attachExotelMediaStreamServer(wss) {
       }
     });
 
-    exotelWs.on('close', () => {
-      cleanup();
+    exotelWs.on('close', (code, reasonBuf) => {
+      const reasonText = reasonBuf ? reasonBuf.toString() : '';
+      cleanup(`ws_close:${code}${reasonText ? `:${reasonText}` : ''}`);
     });
 
     exotelWs.on('error', (error) => {
       console.error('[EXOTEL] Exotel socket error:', error.message);
-      cleanup();
+      cleanup(`ws_error:${error.message}`);
     });
   });
 
