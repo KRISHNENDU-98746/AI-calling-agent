@@ -32,6 +32,7 @@ const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 3000,
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, ''),
+  internalAgentSecret: process.env.INTERNAL_AGENT_SECRET || '',
 
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',

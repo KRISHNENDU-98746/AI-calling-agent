@@ -10,6 +10,7 @@ const { hasFirebaseCredentials } = require('./config/firebase');
 const healthRouter = require('./routes/health');
 const twilioRouter = require('./routes/twilio');
 const exotelRouter = require('./routes/exotel');
+const internalRouter = require('./routes/internal');
 const { attachMediaStreamServer } = require('./websocket/mediaStream');
 const { attachExotelMediaStreamServer } = require('./websocket/exotelMediaStream');
 const { attachEdesyMediaStreamServer } = require('./websocket/edesyMediaStream');
@@ -42,6 +43,7 @@ app.use(express.json({ limit: '100kb' }));
 app.use(healthRouter);
 app.use(twilioRouter);
 app.use(exotelRouter);
+app.use(internalRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

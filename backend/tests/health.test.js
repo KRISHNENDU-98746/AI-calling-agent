@@ -76,6 +76,18 @@ describe('Appointment Voice Agent backend', () => {
     assert.equal(typeof payload.config.firebaseConfigured, 'boolean');
   });
 
+  it('POST /internal/conversation requires the internal secret', async () => {
+    const port = await listen();
+    const res = await request(
+      port,
+      'POST',
+      '/internal/conversation',
+      JSON.stringify({ conversationId: 'test', text: 'Hello' }),
+      { 'Content-Type': 'application/json' }
+    );
+    assert.equal(res.status, 401);
+  });
+
   it('POST /voice returns valid TwiML with Media Stream', async () => {
     const port = await listen();
     const res = await request(
