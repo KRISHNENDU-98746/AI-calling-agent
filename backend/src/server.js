@@ -5,7 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 
-const { env, validateEnv } = require('./config/env');
+const { env, validateEnv, reportTwilioEnvStatus } = require('./config/env');
 const { hasFirebaseCredentials } = require('./config/firebase');
 const healthRouter = require('./routes/health');
 const twilioRouter = require('./routes/twilio');
@@ -100,6 +100,7 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 const envStatus = validateEnv({ strict: false });
+reportTwilioEnvStatus(envStatus.twilio);
 const port = Number(process.env.PORT) || env.port || 3000;
 
 server.listen(port, '0.0.0.0', () => {

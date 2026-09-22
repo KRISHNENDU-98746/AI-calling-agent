@@ -125,7 +125,21 @@ function validateEnv({ strict = false } = {}) {
   return {
     ok: missing.length === 0,
     missing,
+    twilio: {
+      accountSid: Boolean(env.twilio.accountSid),
+      authToken: Boolean(env.twilio.authToken),
+      phoneNumber: Boolean(env.twilio.phoneNumber),
+    },
   };
+}
+
+function reportTwilioEnvStatus(status = {}) {
+  const value = (name) => (status[name] ? 'PRESENT' : 'MISSING');
+  console.log(
+    `[env] Twilio configuration: TWILIO_ACCOUNT_SID=${value('accountSid')} ` +
+      `TWILIO_AUTH_TOKEN=${value('authToken')} ` +
+      `TWILIO_PHONE_NUMBER=${value('phoneNumber')}`
+  );
 }
 
 function getPublicBaseUrl(req) {
@@ -151,6 +165,7 @@ function toWebSocketBaseUrl(httpBaseUrl) {
 module.exports = {
   env,
   validateEnv,
+  reportTwilioEnvStatus,
   getPublicBaseUrl,
   toWebSocketBaseUrl,
 };

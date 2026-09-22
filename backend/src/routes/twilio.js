@@ -5,6 +5,9 @@ const { env, getPublicBaseUrl, toWebSocketBaseUrl } = require('../config/env');
 
 const router = express.Router();
 const { VoiceResponse } = twilio.twiml;
+const OUTBOUND_TEST_TWIML =
+  '<Response><Say>Hello. This is a test call from the clinic appointment assistant.</Say></Response>';
+let twilioClientFactory = (accountSid, authToken) => twilio(accountSid, authToken);
 
 function authorizedForOutboundCall(req) {
   const provided = req.get('x-internal-agent-secret') || '';
@@ -16,6 +19,26 @@ function authorizedForOutboundCall(req) {
 
 function isE164PhoneNumber(value) {
   return typeof value === 'string' && /^\+[1-9]\d{7,14}$/.test(value);
+}
+
+function redactSecrets(value) {
+  if (value === undefined || value === null) return value;
+
+  let safe = String(value);
+  for (const secret of [env.twilio.authToken, env.twilio.accountSid]) {
+    if (secret) safe = safe.split(secret).join('[REDACTED]');
+  }
+  return safe;
+}
+
+function logTwilioError(error) {
+  console.error('[twilio] /make-call failed:', {
+    name: redactSecrets(error?.name || 'Error'),
+    message: redactSecrets(error?.message || 'Unknown Twilio error'),
+    code: redactSecrets(error?.code),
+    status: error?.status ?? error?.statusCode ?? null,
+    moreInfo: redactSecrets(error?.moreInfo),
+  });
 }
 
 function buildMediaStreamUrl(req) {
@@ -115,35 +138,40 @@ router.post('/make-call', async (req, res) => {
 
   const { accountSid, authToken, phoneNumber } = env.twilio;
   if (!accountSid || !authToken || !phoneNumber) {
-    return res.status(503).json({ error: 'Twilio outbound calling is not configured' });
-  }
-
-  let voiceUrl;
-  try {
-    voiceUrl = `${getPublicBaseUrl(req)}/voice`;
-  } catch (error) {
-    console.error('[twilio] /make-call could not determine voice URL:', error.message);
-    return res.status(503).json({ error: 'Public voice URL is not configured' });
+    console.error('[twilio] /make-call failed: required Twilio environment variable is missing');
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to place call',
+      code: 'TWILIO_CONFIG_MISSING',
+    });
   }
 
   try {
-    const client = twilio(accountSid, authToken);
+    const client = twilioClientFactory(accountSid, authToken);
     const call = await client.calls.create({
       to,
       from: phoneNumber,
-      url: voiceUrl,
-      method: 'POST',
+      twiml: OUTBOUND_TEST_TWIML,
     });
 
     return res.status(201).json({
+      success: true,
       callSid: call.sid,
       status: call.status,
     });
   } catch (error) {
-    // Keep Twilio credentials and provider response details out of logs and responses.
-    console.error('[twilio] /make-call failed:', error.code || 'provider_error');
-    return res.status(502).json({ error: 'Unable to place outbound call' });
+    logTwilioError(error);
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to place call',
+      code: error?.code ? String(error.code) : null,
+    });
   }
 });
+
+// Test-only injection point; production uses the Twilio SDK factory above.
+router.setTwilioClientFactoryForTests = (factory) => {
+  twilioClientFactory = factory;
+};
 
 module.exports = router;
