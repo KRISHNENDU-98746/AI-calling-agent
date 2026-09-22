@@ -95,6 +95,42 @@ describe('POST /make-call', () => {
     assert.equal(called, false);
   });
 
+  it('returns 400 for malformed JSON instead of attempting a call', async () => {
+    let called = false;
+    twilioRouter.setTwilioClientFactoryForTests(() => ({
+      calls: { create: async () => { called = true; } },
+    }));
+
+    const port = await listen();
+    const payload = Buffer.from('{"to":"+919635203250"');
+    const response = await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: '127.0.0.1',
+          port,
+          path: '/make-call',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': payload.length,
+            'x-internal-agent-secret': 'test-internal-secret',
+          },
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
+          res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks)) }));
+        }
+      );
+      req.on('error', reject);
+      req.end(payload);
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Invalid JSON request body' });
+    assert.equal(called, false);
+  });
+
   it('returns safe Twilio diagnostics without exposing credentials', async () => {
     const originalError = console.error;
     const logs = [];

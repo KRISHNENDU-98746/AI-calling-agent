@@ -127,6 +127,11 @@ router.post('/voice', maybeValidateTwilioSignature, (req, res) => {
  * This route is intended for trusted backend callers only.
  */
 router.post('/make-call', async (req, res) => {
+  console.log("make-call request body:", {
+    bodyType: typeof req.body,
+    body: req.body
+  });
+
   if (!authorizedForOutboundCall(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

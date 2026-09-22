@@ -51,6 +51,9 @@ app.use((req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error('[server] Unhandled error:', err.message);
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON request body' });
+  }
   res.status(500).json({ error: 'Internal server error' });
 });
 
