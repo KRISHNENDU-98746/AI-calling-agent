@@ -5,8 +5,8 @@ const { env, getPublicBaseUrl, toWebSocketBaseUrl } = require('../config/env');
 
 const router = express.Router();
 const { VoiceResponse } = twilio.twiml;
-const OUTBOUND_TEST_TWIML =
-  '<Response><Say>Hello. This is a test call from the clinic appointment assistant.</Say></Response>';
+const OUTBOUND_GREETING =
+  'Hello, this is the clinic appointment assistant. How can I help you?';
 let twilioClientFactory = (accountSid, authToken) => twilio(accountSid, authToken);
 
 function authorizedForOutboundCall(req) {
@@ -45,6 +45,19 @@ function buildMediaStreamUrl(req) {
   const httpBase = getPublicBaseUrl(req);
   const wsBase = toWebSocketBaseUrl(httpBase);
   return `${wsBase}/media-stream`;
+}
+
+function buildOutboundGatherTwiml(req) {
+  const twiml = new VoiceResponse();
+  const gather = twiml.gather({
+    input: 'speech',
+    action: `${getPublicBaseUrl(req)}/make-call/gather`,
+    method: 'POST',
+    speechTimeout: 'auto',
+    actionOnEmptyResult: true,
+  });
+  gather.say(OUTBOUND_GREETING);
+  return twiml.toString();
 }
 
 function maybeValidateTwilioSignature(req, res, next) {
@@ -156,7 +169,7 @@ router.post('/make-call', async (req, res) => {
     const call = await client.calls.create({
       to,
       from: phoneNumber,
-      twiml: OUTBOUND_TEST_TWIML,
+      twiml: buildOutboundGatherTwiml(req),
     });
 
     return res.status(201).json({
@@ -171,6 +184,16 @@ router.post('/make-call', async (req, res) => {
       error: 'Unable to place call',
       code: error?.code ? String(error.code) : null,
     });
+  }
+});
+
+// Keep the outbound call connected while Twilio collects speech.
+router.post('/make-call/gather', (req, res) => {
+  try {
+    res.type('text/xml').status(200).send(buildOutboundGatherTwiml(req));
+  } catch (error) {
+    console.error('[twilio] /make-call/gather failed:', error.message);
+    res.type('text/xml').status(200).send('<Response><Hangup/></Response>');
   }
 });
 
