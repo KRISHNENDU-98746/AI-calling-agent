@@ -41,6 +41,12 @@ const env = {
     validateRequests: toBool(process.env.TWILIO_VALIDATE_REQUESTS, false),
   },
 
+  groq: {
+    apiKey: process.env.GROQ_API_KEY || '',
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
+    baseUrl: (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, ''),
+  },
+
   exotel: {
     sid: process.env.EXOTEL_SID || '',
     apiKey: process.env.EXOTEL_API_KEY || '',
@@ -63,7 +69,7 @@ const env = {
     baseUrl: 'https://api.sarvam.ai',
     sttLanguage: process.env.SARVAM_STT_LANGUAGE || 'auto',
     sttMode: process.env.SARVAM_STT_MODE || 'codemix',
-    ttsLanguage: process.env.SARVAM_TTS_LANGUAGE || 'en-IN',
+    ttsLanguage: process.env.SARVAM_TTS_LANGUAGE || 'bn-IN',
     ttsSpeaker: process.env.SARVAM_TTS_SPEAKER || 'shubh',
     ttsModel: process.env.SARVAM_TTS_MODEL || 'bulbul:v3',
   },

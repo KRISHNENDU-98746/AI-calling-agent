@@ -5,15 +5,15 @@ const {
   textToSpeech,
   FALLBACK_SPEECH,
 } = require('../services/sarvam');
-const {
-  processConversationTurn,
-  getGreetingMessage,
-  getSaveFailedMessage,
-  EMPTY_APPOINTMENT,
-  STEPS,
-} = require('../services/conversation');
+const { generateAppointmentTurn } = require('../services/groq');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
+
+const BENGALI_GREETING = 'নমস্কার। আমি ক্লিনিকের অ্যাপয়েন্টমেন্ট সহকারী। আপনার নাম বলবেন?';
+const BENGALI_SAVE_FAILED =
+  'দুঃখিত, অ্যাপয়েন্টমেন্টের অনুরোধটি এখন সংরক্ষণ করা যায়নি। পরে আবার চেষ্টা করুন।';
+const BENGALI_SAVE_SUCCESS =
+  'আপনার অ্যাপয়েন্টমেন্টের অনুরোধটি সংরক্ষণ করা হয়েছে। ক্লিনিক আলাদাভাবে নিশ্চিত করবে। ধন্যবাদ।';
 
 const LANGUAGE_TO_TTS = {
   'bn-IN': 'bn-IN',
@@ -58,9 +58,15 @@ function attachMediaStreamServer(wss) {
     let appointmentSaved = false;
     let closed = false;
 
-    let conversationStep = STEPS.ASK_NAME;
-    let appointmentData = { ...EMPTY_APPOINTMENT };
-    let ttsLanguage = env.sarvam.ttsLanguage;
+    let appointmentData = {
+      patientName: null,
+      doctorName: null,
+      preferredDate: null,
+      preferredTime: null,
+      phoneNumber: null,
+    };
+    let ttsLanguage = 'bn-IN';
+    const conversationHistory = [];
 
     console.log(`[media-stream] Client connected conversationId=${conversationId}`);
 
@@ -144,17 +150,14 @@ function attachMediaStreamServer(wss) {
           ttsLanguage = mapLanguageForTts(detectedLanguage);
         }
 
-        const turn = processConversationTurn({
+        const turn = await generateAppointmentTurn({
           userText: text,
-          detectedLanguage: detectedLanguage || ttsLanguage,
-          step: conversationStep,
+          history: conversationHistory,
           appointmentData,
           clinicName: env.clinic.name,
           doctors: env.clinic.doctors,
-          callerPhone,
         });
 
-        conversationStep = turn.step;
         appointmentData = {
           ...appointmentData,
           ...turn.appointmentData,
@@ -164,15 +167,18 @@ function attachMediaStreamServer(wss) {
           appointmentData.phoneNumber = callerPhone;
         }
 
-        if (turn.detectedLanguage) {
-          ttsLanguage = mapLanguageForTts(turn.detectedLanguage);
-        }
+        ttsLanguage = mapLanguageForTts(turn.responseLanguage);
 
-        if (turn.appointmentReady && !appointmentSaved) {
+        conversationHistory.push(
+          { role: 'user', content: text },
+          { role: 'assistant', content: turn.reply }
+        );
+
+        if (turn.shouldSave && !appointmentSaved) {
           try {
             await saveAppointmentRequest({
               ...appointmentData,
-              language: turn.detectedLanguage || ttsLanguage,
+              language: turn.responseLanguage || 'bn',
               conversationId,
               callSid,
             });
@@ -180,16 +186,15 @@ function attachMediaStreamServer(wss) {
             console.log(
               `[media-stream] Appointment request saved conversationId=${conversationId}`
             );
-            await speakText(turn.response, ttsLanguage);
+            await speakText(BENGALI_SAVE_SUCCESS, 'bn-IN');
           } catch (error) {
             console.error('[media-stream] Firestore save failed:', error.message);
-            conversationStep = STEPS.CONFIRM;
-            await speakText(getSaveFailedMessage(ttsLanguage), ttsLanguage);
+            await speakText(BENGALI_SAVE_FAILED, 'bn-IN');
           }
           return;
         }
 
-        await speakText(turn.response, ttsLanguage);
+        await speakText(turn.reply, ttsLanguage);
       } finally {
         processingTurn = false;
       }
@@ -294,11 +299,9 @@ function attachMediaStreamServer(wss) {
 
           if (!greetingSent) {
             greetingSent = true;
-            conversationStep = STEPS.ASK_NAME;
-            const greeting = getGreetingMessage(env.clinic.name, ttsLanguage);
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
-              speakText(greeting, ttsLanguage);
+              speakText(BENGALI_GREETING, 'bn-IN');
             }, 300);
           }
           break;
