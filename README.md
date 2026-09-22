@@ -170,6 +170,17 @@ so the Media Stream WebSocket URL becomes `wss://YOUR-TUNNEL-DOMAIN/media-stream
 
 Add all `.env` variables in the Render Environment dashboard.
 
+For a PowerShell request to the protected outbound-call endpoint, use
+`Invoke-RestMethod` so PowerShell does not strip the JSON quotes when invoking
+`curl.exe`:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "https://YOUR-SERVICE.onrender.com/make-call" `
+  -Headers @{ "Content-Type" = "application/json"; "x-internal-agent-secret" = "YOUR_SECRET" } `
+  -Body '{"to":"+919635203250"}'
+```
+
 Set:
 
 ```env
