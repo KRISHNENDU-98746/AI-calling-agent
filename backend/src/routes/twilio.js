@@ -136,7 +136,7 @@ router.post('/make-call', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { to } = req.body || {};
+  const to = req.body?.to;
   if (!isE164PhoneNumber(to)) {
     return res.status(400).json({ error: 'to must be a valid E.164 phone number' });
   }
