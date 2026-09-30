@@ -1,7 +1,7 @@
 const { getFirestore, isFirebaseReady } = require('../config/firebase');
 
 const defaultConfig = {
-  clinicName: 'S.N. Tripathi Clinic', doctorName: 'S.N. Tripathi', specialty: 'General physician',
+  clinicName: 'S. N. Tripathi', doctorName: 'S. N. Tripathi', specialty: 'General physician',
   agentGreeting: 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?', closedBehavior: 'polite', replyStyle: 'short',
   clinicOpen: true, doctorAvailable: true, agentEnabled: true,
   clinicClosedMessage: 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।',

@@ -28,7 +28,7 @@ function applyConfig(config) {
   document.querySelector('#agentStatus').innerHTML = live ? '<i></i> Live' : '<i style="background:#c58e6c"></i> Paused';
   document.querySelector('#callToggle').classList.toggle('is-on', live);
   document.querySelector('.toggle-label').innerHTML = live ? '<i class="pulse"></i> Accepting calls' : '<i class="pulse" style="background:#c58e6c;box-shadow:0 0 0 3px #f4e6dc"></i> Calls paused';
-  const doctor = document.querySelector('.doctor-line strong'); if (doctor) doctor.textContent = config.doctorName || 'Dr. Anik Rahman';
+  const doctor = document.querySelector('.doctor-line strong'); if (doctor) doctor.textContent = config.doctorName || 'S. N. Tripathi';
   const specialty = document.querySelector('.doctor-line span:not(.available-badge)'); if (specialty) specialty.textContent = config.specialty || 'General physician';
   const available = document.querySelector('.available-badge'); if (available) available.innerHTML = live ? '<i></i> Available today' : '<i style="background:#c58e6c"></i> Not available';
   const hours = document.querySelector('.hours-summary'); if (hours && config.hours) hours.innerHTML = `<span><b>${config.hours.start}</b> Start</span><span><b>${config.hours.end}</b> End</span><span><b>${config.appointmentDurationMinutes} min</b> per visit</span>`;
