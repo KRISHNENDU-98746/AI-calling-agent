@@ -8,7 +8,7 @@ const {
 const { generateAppointmentTurn } = require('../services/groq');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
-const { getClinicConfig } = require('../services/clinicConfig');
+const { getClinicConfig, isClinicAvailable } = require('../services/clinicConfig');
 
 const BENGALI_GREETING = 'নমস্কার। আমি ক্লিনিকের অ্যাপয়েন্টমেন্ট সহকারী। আপনার নাম বলবেন?';
 const BENGALI_SAVE_FAILED =
@@ -148,7 +148,7 @@ function attachMediaStreamServer(wss) {
       clearTwilioBuffer();
 
       try {
-        if (!clinicConfig || !clinicConfig.clinicOpen || !clinicConfig.doctorAvailable || !clinicConfig.agentEnabled) {
+        if (!clinicConfig || !isClinicAvailable(clinicConfig)) {
           await speakText(clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।', 'bn-IN');
           return;
         }
@@ -309,13 +309,13 @@ function attachMediaStreamServer(wss) {
             return null;
           });
 
-          if (clinicConfig?.clinicOpen && clinicConfig?.doctorAvailable && clinicConfig?.agentEnabled) connectStt();
+          if (clinicConfig && isClinicAvailable(clinicConfig)) connectStt();
 
           if (!greetingSent) {
             greetingSent = true;
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
-              const greeting = clinicConfig?.clinicOpen && clinicConfig?.doctorAvailable && clinicConfig?.agentEnabled
+              const greeting = clinicConfig && isClinicAvailable(clinicConfig)
                 ? (clinicConfig.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?')
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
               speakText(greeting, 'bn-IN');

@@ -33,4 +33,29 @@ async function updateClinicConfig(input) {
   return next;
 }
 
-module.exports = { defaultConfig, getClinicConfig, updateClinicConfig };
+function minutesFromClock(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function getIndiaMinutes(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(now);
+  return Number(parts.find((part) => part.type === 'hour')?.value || 0) * 60 + Number(parts.find((part) => part.type === 'minute')?.value || 0);
+}
+
+function isWithinClinicHours(config, now = new Date()) {
+  const start = minutesFromClock(config?.hours?.start);
+  const end = minutesFromClock(config?.hours?.end);
+  if (start === null || end === null) return true;
+  const current = getIndiaMinutes(now);
+  return start <= end ? current >= start && current < end : current >= start || current < end;
+}
+
+function isClinicAvailable(config, now = new Date()) {
+  return Boolean(config?.clinicOpen && config?.doctorAvailable && config?.agentEnabled && isWithinClinicHours(config, now));
+}
+
+module.exports = { defaultConfig, getClinicConfig, updateClinicConfig, isWithinClinicHours, isClinicAvailable };

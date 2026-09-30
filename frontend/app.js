@@ -12,6 +12,7 @@ function initials(name = '') { return name.split(' ').map((part) => part[0]).joi
 function apiHeaders() { return { 'Content-Type': 'application/json', ...(API_KEY ? { 'x-admin-api-key': API_KEY } : {}) }; }
 async function api(path, options = {}) { const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...apiHeaders(), ...(options.headers || {}) } }); if (!response.ok) throw new Error(`API ${response.status}`); return response.json(); }
 function appointmentTime(value = '') { const match = String(value).match(/(\d{1,2}):(\d{2})/); if (!match) return { time: value || '--:--', period: '' }; const hour = Number(match[1]); return { time: `${String(hour > 12 ? hour - 12 : hour).padStart(2, '0')}:${match[2]}`, period: hour >= 12 ? 'PM' : 'AM' }; }
+function isWithinHours(config) { const toMinutes = (value) => { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }; const start = toMinutes(config?.hours?.start); const end = toMinutes(config?.hours?.end); if (start === null || end === null) return true; const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date()); const now = Number(parts.find((part) => part.type === 'hour')?.value || 0) * 60 + Number(parts.find((part) => part.type === 'minute')?.value || 0); return start <= end ? now >= start && now < end : now >= start || now < end; }
 function renderAppointments(items, demoIfEmpty = false) {
   const source = items.length ? items.slice(0, 5) : (demoIfEmpty ? demoAppointments : []);
   if (!source.length) { document.querySelector('#appointmentList').innerHTML = '<div class="empty-state">No appointments yet. New requests will appear here.</div>'; return; }
@@ -24,7 +25,7 @@ function renderPatients(items, demoIfEmpty = false) {
 }
 function applyConfig(config) {
   if (!config) return;
-  const live = Boolean(config.agentEnabled && config.clinicOpen && config.doctorAvailable);
+  const live = Boolean(config.agentEnabled && config.clinicOpen && config.doctorAvailable && isWithinHours(config));
   document.querySelector('#agentStatus').innerHTML = live ? '<i></i> Live' : '<i style="background:#c58e6c"></i> Paused';
   document.querySelector('#callToggle').classList.toggle('is-on', live);
   document.querySelector('.toggle-label').innerHTML = live ? '<i class="pulse"></i> Accepting calls' : '<i class="pulse" style="background:#c58e6c;box-shadow:0 0 0 3px #f4e6dc"></i> Calls paused';
