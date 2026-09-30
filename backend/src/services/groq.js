@@ -97,7 +97,7 @@ async function generateAppointmentTurn({
     body: JSON.stringify({
       model: env.groq.model,
       temperature: 0.2,
-      max_completion_tokens: 300,
+      max_completion_tokens: 180,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: GROQ_SYSTEM_PROMPT },

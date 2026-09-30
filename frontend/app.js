@@ -25,7 +25,7 @@ function renderPatients(items, demoIfEmpty = false) {
 }
 function applyConfig(config) {
   if (!config) return;
-  const live = Boolean(config.agentEnabled && config.clinicOpen && config.doctorAvailable && isWithinHours(config));
+  const live = Boolean(config.testMode || (config.agentEnabled && config.clinicOpen && config.doctorAvailable && isWithinHours(config)));
   document.querySelector('#agentStatus').innerHTML = live ? '<i></i> Live' : '<i style="background:#c58e6c"></i> Paused';
   document.querySelector('#callToggle').classList.toggle('is-on', live);
   document.querySelector('.toggle-label').innerHTML = live ? '<i class="pulse"></i> Accepting calls' : '<i class="pulse" style="background:#c58e6c;box-shadow:0 0 0 3px #f4e6dc"></i> Calls paused';

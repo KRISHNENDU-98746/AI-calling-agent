@@ -217,7 +217,7 @@ function attachMediaStreamServer(wss) {
           encoding: 'mulaw',
           sampleRate: 8000,
           streamType: 'fast',
-          silenceDurationMs: 800,
+          silenceDurationMs: 500,
         });
       } catch (error) {
         console.error('[media-stream] STT connection setup failed:', error.message);
@@ -319,7 +319,7 @@ function attachMediaStreamServer(wss) {
                 ? (clinicConfig.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?')
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
               speakText(greeting, 'bn-IN');
-            }, 300);
+            }, 0);
           }
           break;
         }
