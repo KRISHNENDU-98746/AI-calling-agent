@@ -42,10 +42,15 @@ async function loadDashboard() {
 async function saveConfig(update, successMessage) { try { const data = await api('/admin/config', { method: 'PATCH', body: JSON.stringify(update) }); currentConfig = data.config; applyConfig(data.config); showToast(successMessage); } catch (error) { showToast('Could not save settings. Check the backend connection.'); } }
 
 document.querySelector('#callToggle').addEventListener('click', () => { const next = !document.querySelector('#callToggle').classList.contains('is-on'); saveConfig({ agentEnabled: next, clinicOpen: next }, next ? 'AI agent is now accepting calls' : 'AI agent has been paused'); });
-document.querySelector('#editAgent').addEventListener('click', () => {
-  const greeting = prompt('Opening line for the agent:', currentConfig?.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?');
-  if (greeting !== null) saveConfig({ agentGreeting: greeting }, 'Agent greeting updated');
-});
+const agentModal = document.querySelector('#agentModal');
+function openAgentModal() { agentModal.classList.add('open'); agentModal.setAttribute('aria-hidden', 'false'); }
+function closeAgentModal() { agentModal.classList.remove('open'); agentModal.setAttribute('aria-hidden', 'true'); }
+document.querySelector('#editAgent').addEventListener('click', openAgentModal);
+document.querySelector('#closeAgentModal').addEventListener('click', closeAgentModal);
+document.querySelector('#cancelAgentModal').addEventListener('click', closeAgentModal);
+document.querySelectorAll('.mcq-options').forEach((group) => group.addEventListener('click', (event) => { const option = event.target.closest('button'); if (!option) return; group.querySelectorAll('button').forEach((item) => item.classList.remove('selected')); option.classList.add('selected'); }));
+document.querySelector('#saveAgentModal').addEventListener('click', () => { const greeting = document.querySelector('[data-choice="greeting"] .selected')?.dataset.value || 'standard'; const greetingText = greeting === 'short' ? 'নমস্কার, appointment নিতে call করেছেন? আপনার নাম বলবেন?' : 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?'; const closedBehavior = document.querySelector('[data-choice="closed"] .selected')?.dataset.value || 'polite'; const replyStyle = document.querySelector('[data-choice="style"] .selected')?.dataset.value || 'short'; saveConfig({ agentGreeting: greetingText, closedBehavior, replyStyle }, 'Agent options updated'); closeAgentModal(); });
+agentModal.addEventListener('click', (event) => { if (event.target === agentModal) closeAgentModal(); });
 document.querySelector('#editSchedule').addEventListener('click', () => { const open = confirm('Press OK to mark the doctor available today. Press Cancel to mark unavailable.'); saveConfig({ doctorAvailable: open }, open ? 'Doctor marked available' : 'Doctor marked unavailable'); });
 document.querySelector('#newAppointment').addEventListener('click', () => showToast('New appointments are created by callers through the Twilio agent'));
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', (event) => { document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active')); event.currentTarget.classList.add('active'); }));
