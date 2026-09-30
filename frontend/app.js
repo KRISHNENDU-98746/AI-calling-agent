@@ -56,3 +56,4 @@ document.querySelector('#editSchedule').addEventListener('click', () => { const 
 document.querySelector('#newAppointment').addEventListener('click', () => showToast('New appointments are created by callers through the Twilio agent'));
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', (event) => { document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active')); event.currentTarget.classList.add('active'); }));
 loadDashboard();
+setInterval(() => { if (currentConfig) applyConfig(currentConfig); }, 60 * 1000);
