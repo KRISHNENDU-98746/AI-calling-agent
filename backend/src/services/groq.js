@@ -1,4 +1,5 @@
 const { env } = require('../config/env');
+const { predictTinyIntent } = require('./tinyIntent');
 
 const APPOINTMENT_FIELDS = [
   'patientName',
@@ -88,6 +89,8 @@ async function generateAppointmentTurn({
 }) {
   if (!env.groq.apiKey) throw new Error('GROQ_API_KEY is not configured');
 
+  const fastIntent = await predictTinyIntent(userText);
+
   const response = await fetchImplementation(`${env.groq.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -109,6 +112,7 @@ async function generateAppointmentTurn({
             availableDoctors: doctors,
             collectedAppointmentData: appointmentData,
             callerMessage: userText,
+            fastIntent,
             requiredResponseSchema: {
               reply: 'string',
               responseLanguage: 'bn|hi|en',
