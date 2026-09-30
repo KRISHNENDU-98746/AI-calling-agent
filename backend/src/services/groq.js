@@ -7,11 +7,11 @@ const APPOINTMENT_FIELDS = [
   'preferredTime',
 ];
 
-const GROQ_SYSTEM_PROMPT = `You are a strict clinic appointment-booking voice assistant.
+const GROQ_SYSTEM_PROMPT = `You are a strict clinic appointment-booking voice assistant for one fixed doctor.
 
 Scope:
 - Help only with creating an appointment booking request.
-- Collect patient name, doctor name, preferred date, and preferred time.
+- Collect patient name, preferred date, and preferred time. The doctor is already configured; never ask the caller to choose or provide a doctor name.
 - Never give medical advice, diagnoses, prescriptions, treatment recommendations, or emergency guidance. If asked, briefly say you can only help with appointment requests and continue with the missing booking detail.
 - Never claim an appointment is confirmed. Saving means only that a request was recorded; the clinic must confirm separately.
 

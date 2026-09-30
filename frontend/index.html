@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f7f2" />
+    <title>Careflow · Clinic console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Careflow home">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <span>careflow</span>
+        </a>
+
+        <div class="clinic-switcher">
+          <div class="clinic-avatar">SC</div>
+          <div>
+            <strong>Shanti Clinic</strong>
+            <span>Dhaka · Main branch</span>
+          </div>
+          <span class="chevron">⌄</span>
+        </div>
+
+        <nav class="nav-list" aria-label="Main navigation">
+          <p class="nav-label">Workspace</p>
+          <a class="nav-item active" href="#overview"><span class="nav-icon">◈</span>Overview</a>
+          <a class="nav-item" href="#appointments"><span class="nav-icon">▦</span>Appointments <b class="nav-count">12</b></a>
+          <a class="nav-item" href="#patients"><span class="nav-icon">♧</span>Patients</a>
+          <a class="nav-item" href="#schedule"><span class="nav-icon">◷</span>Schedule</a>
+          <p class="nav-label nav-label-spaced">Assistant</p>
+          <a class="nav-item" href="#agent"><span class="nav-icon">✦</span>AI agent <i class="live-dot"></i></a>
+          <a class="nav-item" href="#settings"><span class="nav-icon">⚙</span>Settings</a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="help-card"><span class="help-orb">?</span><div><strong>Need a hand?</strong><small>Talk to support</small></div><span>↗</span></div>
+          <div class="user-row"><div class="user-avatar">AR</div><div><strong>Arif Rahman</strong><small>Clinic admin</small></div><span class="more">•••</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <div><p class="eyebrow">WEDNESDAY, 30 SEPTEMBER 2026</p><h1>Good morning, Arif <span class="wave">✦</span></h1></div>
+          <div class="top-actions"><button class="icon-button" aria-label="Notifications">♢<span class="notification-dot"></span></button><button class="avatar-button">AR</button></div>
+        </header>
+
+        <section class="hero-row">
+          <div><h2>Today at a glance</h2><p class="muted">Here’s what’s happening at Shanti Clinic.</p></div>
+          <button class="button button-dark" id="newAppointment"><span>＋</span> New appointment</button>
+        </section>
+
+        <section class="stats-grid" aria-label="Clinic summary">
+          <article class="stat-card accent-card"><div class="stat-top"><span>Appointments today</span><span class="stat-icon">◫</span></div><strong>12</strong><p><span class="up">↗ 20%</span> vs yesterday</p><div class="mini-bars"><i style="height:34%"></i><i style="height:54%"></i><i style="height:42%"></i><i style="height:68%"></i><i style="height:50%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:92%"></i><i style="height:74%"></i><i style="height:100%"></i></div></article>
+          <article class="stat-card"><div class="stat-top"><span>Patients served</span><span class="stat-icon lavender">♧</span></div><strong>08</strong><p><span class="up">↗ 12%</span> this week</p><div class="stat-note"><span class="tiny-ring"></span> 4 more in queue</div></article>
+          <article class="stat-card"><div class="stat-top"><span>Avg. wait time</span><span class="stat-icon peach">◷</span></div><strong>18 <em>min</em></strong><p><span class="down">↘ 6%</span> from last week</p><div class="wait-line"><span></span></div></article>
+        </section>
+
+        <div class="content-grid">
+          <section class="panel appointments-panel" id="appointments">
+            <div class="panel-heading"><div><h3>Today’s appointments</h3><p class="muted">Wednesday, 30 September</p></div><button class="text-button">View all <span>→</span></button></div>
+            <div class="appointment-list" id="appointmentList"></div>
+          </section>
+
+          <section class="panel agent-panel" id="agent">
+            <div class="panel-heading"><div><h3>AI calling agent</h3><p class="muted">Your clinic’s first point of contact</p></div><span class="status-pill" id="agentStatus"><i></i> Live</span></div>
+            <div class="agent-visual"><div class="sound-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="agent-orb">✦</div><div class="sound-wave right"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="agent-copy"><strong>Dr. Rahman’s assistant</strong><p>Ready to answer calls and book appointments.</p></div>
+            <div class="agent-control"><span class="toggle-label"><i class="pulse"></i> Accepting calls</span><button class="toggle is-on" id="callToggle" aria-label="Toggle accepting calls"><span></span></button></div>
+            <button class="button button-outline full-width" id="editAgent">Edit agent behaviour <span>→</span></button>
+          </section>
+
+          <section class="panel schedule-panel" id="schedule">
+            <div class="panel-heading"><div><h3>Doctor’s schedule</h3><p class="muted">Manage availability for today</p></div><button class="text-button" id="editSchedule">Edit <span>→</span></button></div>
+            <div class="doctor-line"><div class="doctor-avatar">DR</div><div><strong>Dr. Anik Rahman</strong><span>General physician</span></div><span class="available-badge"><i></i> Available today</span></div>
+            <div class="schedule-track"><div class="time-row"><span>09:00 AM</span><span>01:00 PM</span><span>05:00 PM</span></div><div class="track"><span class="track-fill"></span><i class="track-dot dot-one"></i><i class="track-dot dot-two"></i><i class="track-dot dot-three"></i></div><div class="slot-row"><span>Morning</span><span>Afternoon</span><span>Evening</span></div></div>
+            <div class="hours-summary"><span><b>09:00</b> Start</span><span><b>05:00</b> End</span><span><b>15 min</b> per visit</span></div>
+          </section>
+
+          <section class="panel patients-panel" id="patients">
+            <div class="panel-heading"><div><h3>Recent patients</h3><p class="muted">Your latest appointment requests</p></div><button class="text-button">View patients <span>→</span></button></div>
+            <div class="patient-table"><div class="table-head"><span>Patient</span><span>Token</span><span>Time</span><span>Status</span></div><div id="patientRows"></div></div>
+          </section>
+        </div>
+
+        <footer class="footer-note"><span class="secure-icon">✓</span> Your patient data is securely stored <span class="footer-separator">·</span> <a href="#">Privacy & security</a><span class="version">Careflow v0.1</span></footer>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

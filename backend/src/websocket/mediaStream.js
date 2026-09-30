@@ -8,6 +8,7 @@ const {
 const { generateAppointmentTurn } = require('../services/groq');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
+const { getClinicConfig } = require('../services/clinicConfig');
 
 const BENGALI_GREETING = 'নমস্কার। আমি ক্লিনিকের অ্যাপয়েন্টমেন্ট সহকারী। আপনার নাম বলবেন?';
 const BENGALI_SAVE_FAILED =
@@ -57,6 +58,7 @@ function attachMediaStreamServer(wss) {
     let greetingSent = false;
     let appointmentSaved = false;
     let closed = false;
+    let clinicConfig = null;
 
     let appointmentData = {
       patientName: null,
@@ -146,6 +148,13 @@ function attachMediaStreamServer(wss) {
       clearTwilioBuffer();
 
       try {
+        if (!clinicConfig || !clinicConfig.clinicOpen || !clinicConfig.doctorAvailable || !clinicConfig.agentEnabled) {
+          await speakText(clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।', 'bn-IN');
+          return;
+        }
+
+        appointmentData.doctorName = clinicConfig.doctorName || appointmentData.doctorName || 'Dr. Rahman';
+
         if (detectedLanguage) {
           ttsLanguage = mapLanguageForTts(detectedLanguage);
         }
@@ -154,8 +163,8 @@ function attachMediaStreamServer(wss) {
           userText: text,
           history: conversationHistory,
           appointmentData,
-          clinicName: env.clinic.name,
-          doctors: env.clinic.doctors,
+          clinicName: clinicConfig.clinicName || env.clinic.name,
+          doctors: [clinicConfig.doctorName || 'Dr. Rahman'],
         });
 
         appointmentData = {
@@ -295,13 +304,21 @@ function attachMediaStreamServer(wss) {
             }`
           );
 
-          connectStt();
+          clinicConfig = await getClinicConfig().catch((error) => {
+            console.error('[media-stream] Clinic config unavailable:', error.message);
+            return null;
+          });
+
+          if (clinicConfig?.clinicOpen && clinicConfig?.doctorAvailable && clinicConfig?.agentEnabled) connectStt();
 
           if (!greetingSent) {
             greetingSent = true;
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
-              speakText(BENGALI_GREETING, 'bn-IN');
+              const greeting = clinicConfig?.clinicOpen && clinicConfig?.doctorAvailable && clinicConfig?.agentEnabled
+                ? `নমস্কার। ${clinicConfig.doctorName || 'ডাক্তারের'} appointment assistant বলছি। আপনার নাম বলবেন?`
+                : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
+              speakText(greeting, 'bn-IN');
             }, 300);
           }
           break;
