@@ -316,7 +316,7 @@ function attachMediaStreamServer(wss) {
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
               const greeting = clinicConfig?.clinicOpen && clinicConfig?.doctorAvailable && clinicConfig?.agentEnabled
-                ? `নমস্কার। ${clinicConfig.doctorName || 'ডাক্তারের'} appointment assistant বলছি। আপনার নাম বলবেন?`
+                ? (clinicConfig.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?')
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
               speakText(greeting, 'bn-IN');
             }, 300);

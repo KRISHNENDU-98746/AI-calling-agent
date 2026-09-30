@@ -42,7 +42,10 @@ async function loadDashboard() {
 async function saveConfig(update, successMessage) { try { const data = await api('/admin/config', { method: 'PATCH', body: JSON.stringify(update) }); currentConfig = data.config; applyConfig(data.config); showToast(successMessage); } catch (error) { showToast('Could not save settings. Check the backend connection.'); } }
 
 document.querySelector('#callToggle').addEventListener('click', () => { const next = !document.querySelector('#callToggle').classList.contains('is-on'); saveConfig({ agentEnabled: next, clinicOpen: next }, next ? 'AI agent is now accepting calls' : 'AI agent has been paused'); });
-document.querySelector('#editAgent').addEventListener('click', () => { const message = prompt('Message the agent should say when the clinic is closed:', currentConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।'); if (message !== null) saveConfig({ clinicClosedMessage: message }, 'Agent behaviour updated'); });
+document.querySelector('#editAgent').addEventListener('click', () => {
+  const greeting = prompt('Opening line for the agent:', currentConfig?.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?');
+  if (greeting !== null) saveConfig({ agentGreeting: greeting }, 'Agent greeting updated');
+});
 document.querySelector('#editSchedule').addEventListener('click', () => { const open = confirm('Press OK to mark the doctor available today. Press Cancel to mark unavailable.'); saveConfig({ doctorAvailable: open }, open ? 'Doctor marked available' : 'Doctor marked unavailable'); });
 document.querySelector('#newAppointment').addEventListener('click', () => showToast('New appointments are created by callers through the Twilio agent'));
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', (event) => { document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active')); event.currentTarget.classList.add('active'); }));
