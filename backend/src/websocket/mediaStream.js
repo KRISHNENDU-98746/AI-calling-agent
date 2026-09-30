@@ -14,7 +14,7 @@ const BENGALI_GREETING = 'নমস্কার। আমি ক্লিনি�
 const BENGALI_SAVE_FAILED =
   'দুঃখিত, অ্যাপয়েন্টমেন্টের অনুরোধটি এখন সংরক্ষণ করা যায়নি। পরে আবার চেষ্টা করুন।';
 const BENGALI_SAVE_SUCCESS =
-  'আপনার অ্যাপয়েন্টমেন্টের অনুরোধটি সংরক্ষণ করা হয়েছে। ক্লিনিক আলাদাভাবে নিশ্চিত করবে। ধন্যবাদ।';
+  'ধন্যবাদ। আপনার appointment confirm করা হয়েছে। S.N. Tripathi-র clinic-এ আপনার appointment নোট করা হয়েছে।';
 
 const LANGUAGE_TO_TTS = {
   'bn-IN': 'bn-IN',
