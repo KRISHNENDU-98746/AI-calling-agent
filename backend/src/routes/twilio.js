@@ -47,6 +47,15 @@ function buildMediaStreamUrl(req) {
   return `${wsBase}/media-stream`;
 }
 
+function buildMediaStreamTwiml(req) {
+  const twiml = new VoiceResponse();
+  const connect = twiml.connect();
+  const stream = connect.stream({ url: buildMediaStreamUrl(req) });
+  stream.parameter({ name: 'from', value: req.body?.From || req.body?.from || '' });
+  stream.parameter({ name: 'to', value: req.body?.To || req.body?.to || '' });
+  return twiml.toString();
+}
+
 function buildOutboundGatherTwiml(req) {
   const twiml = new VoiceResponse();
   const gather = twiml.gather({
@@ -169,7 +178,10 @@ router.post('/make-call', async (req, res) => {
     const call = await client.calls.create({
       to,
       from: phoneNumber,
-      twiml: buildOutboundGatherTwiml(req),
+      // Route outbound calls through the same bidirectional AI Media Stream
+      // used by inbound calls. The old Gather flow only played Twilio's static
+      // greeting and never reached Sarvam/Groq.
+      twiml: buildMediaStreamTwiml({ ...req, body: { ...(req.body || {}), To: to } }),
     });
 
     return res.status(201).json({
