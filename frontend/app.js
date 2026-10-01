@@ -43,6 +43,11 @@ function applyConfig(config) {
   const live = Boolean(config.testMode || (config.agentEnabled && config.clinicOpen && config.doctorAvailable && isWithinHours(config)));
   document.querySelector('#agentStatus').innerHTML = live ? '<i></i> Live' : '<i style="background:#c58e6c"></i> Paused';
   document.querySelector('#callToggle').classList.toggle('is-on', live);
+  const testModeButton = document.querySelector('#testModeToggle');
+  if (testModeButton) {
+    testModeButton.textContent = `Test mode: ${config.testMode ? 'On' : 'Off'}`;
+    testModeButton.classList.toggle('selected', Boolean(config.testMode));
+  }
   document.querySelector('.toggle-label').innerHTML = live ? '<i class="pulse"></i> Accepting calls' : '<i class="pulse" style="background:#c58e6c;box-shadow:0 0 0 3px #f4e6dc"></i> Calls paused';
   const doctor = document.querySelector('.doctor-line strong'); if (doctor) doctor.textContent = config.doctorName || 'S. N. Tripathi';
   const specialty = document.querySelector('.doctor-line span:not(.available-badge)'); if (specialty) specialty.textContent = config.specialty || 'General physician';
@@ -59,6 +64,7 @@ async function loadDashboard() {
 async function saveConfig(update, successMessage) { try { const data = await api('/admin/config', { method: 'PATCH', body: JSON.stringify(update) }); currentConfig = data.config; applyConfig(data.config); showToast(successMessage); } catch (error) { showToast('Could not save settings. Check the backend connection.'); } }
 
 document.querySelector('#callToggle').addEventListener('click', () => { const next = !document.querySelector('#callToggle').classList.contains('is-on'); saveConfig({ agentEnabled: next, clinicOpen: next }, next ? 'AI agent is now accepting calls' : 'AI agent has been paused'); });
+document.querySelector('#testModeToggle').addEventListener('click', () => { const next = !Boolean(currentConfig?.testMode); saveConfig({ testMode: next }, next ? 'Test mode is now ON' : 'Test mode is now OFF'); });
 const agentModal = document.querySelector('#agentModal');
 function openAgentModal() { agentModal.classList.add('open'); agentModal.setAttribute('aria-hidden', 'false'); }
 function closeAgentModal() { agentModal.classList.remove('open'); agentModal.setAttribute('aria-hidden', 'true'); }
