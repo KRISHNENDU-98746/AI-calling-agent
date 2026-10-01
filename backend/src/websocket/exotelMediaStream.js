@@ -294,7 +294,7 @@ function attachExotelMediaStreamServer(wss) {
 
         if (turn.appointmentReady && !appointmentSaved) {
           try {
-            await saveAppointmentRequest({
+            const savedAppointment = await saveAppointmentRequest({
               ...appointmentData,
               language: turn.detectedLanguage || ttsLanguage,
               conversationId,
@@ -305,7 +305,7 @@ function attachExotelMediaStreamServer(wss) {
             console.log(
               `[EXOTEL] Appointment request saved conversationId=${conversationId}`
             );
-            await speakText(turn.response, ttsLanguage);
+            await speakText(`${turn.response} আপনি ${savedAppointment.assignedTime || appointmentData.preferredTime}-এ clinic-এ আসবেন। আপনার token number ${savedAppointment.token || 'নির্ধারিত'}।`, ttsLanguage);
           } catch (error) {
             console.error('[EXOTEL] Firestore save failed:', error.message);
             conversationStep = STEPS.CONFIRM;

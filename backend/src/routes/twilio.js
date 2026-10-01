@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const twilio = require('twilio');
 const { env, getPublicBaseUrl, toWebSocketBaseUrl } = require('../config/env');
+const { getClinicConfig, isClinicAvailable } = require('../services/clinicConfig');
 
 const router = express.Router();
 const { VoiceResponse } = twilio.twiml;
@@ -49,10 +50,12 @@ function buildMediaStreamUrl(req) {
 
 function buildMediaStreamTwiml(req) {
   const twiml = new VoiceResponse();
+  twiml.play(`${env.voiceAudioBaseUrl}/audio/greeting.mp3`);
   const connect = twiml.connect();
   const stream = connect.stream({ url: buildMediaStreamUrl(req) });
   stream.parameter({ name: 'from', value: req.body?.From || req.body?.from || '' });
   stream.parameter({ name: 'to', value: req.body?.To || req.body?.to || '' });
+  stream.parameter({ name: 'skipGreeting', value: 'true' });
   return twiml.toString();
 }
 
@@ -111,7 +114,7 @@ function maybeValidateTwilioSignature(req, res, next) {
  * Patient calls the Twilio number -> we answer and open a bidirectional Media Stream.
  * This does NOT place an outbound call to the doctor.
  */
-router.post('/voice', maybeValidateTwilioSignature, (req, res) => {
+router.post('/voice', maybeValidateTwilioSignature, async (req, res) => {
   try {
     const callSid = req.body?.CallSid || 'unknown';
     const from = req.body?.From || 'unknown';
@@ -120,6 +123,9 @@ router.post('/voice', maybeValidateTwilioSignature, (req, res) => {
 
     const streamUrl = buildMediaStreamUrl(req);
     const twiml = new VoiceResponse();
+    const clinicConfig = await getClinicConfig().catch(() => null);
+    const audioName = clinicConfig && isClinicAvailable(clinicConfig) ? 'greeting.mp3' : 'clinic-closed.mp3';
+    twiml.play(`${env.voiceAudioBaseUrl}/audio/${audioName}`);
     const connect = twiml.connect();
     const stream = connect.stream({
       url: streamUrl,
@@ -129,6 +135,7 @@ router.post('/voice', maybeValidateTwilioSignature, (req, res) => {
     stream.parameter({ name: 'callSid', value: callSid });
     stream.parameter({ name: 'from', value: from });
     stream.parameter({ name: 'to', value: req.body?.To || env.twilio.phoneNumber || '' });
+    stream.parameter({ name: 'skipGreeting', value: 'true' });
 
     res.type('text/xml').status(200).send(twiml.toString());
   } catch (error) {

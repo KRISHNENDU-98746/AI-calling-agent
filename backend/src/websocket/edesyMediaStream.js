@@ -217,7 +217,7 @@ function attachEdesyMediaStreamServer(wss) {
 
         if (turn.appointmentReady && !appointmentSaved) {
           try {
-            await saveAppointmentRequest({
+            const savedAppointment = await saveAppointmentRequest({
               ...appointmentData,
               language: turn.detectedLanguage || ttsLanguage,
               conversationId,
@@ -228,7 +228,7 @@ function attachEdesyMediaStreamServer(wss) {
             console.log(
               `[edesy-media] Appointment request saved conversationId=${conversationId}`
             );
-            await speakText(turn.response, ttsLanguage);
+            await speakText(`${turn.response} আপনি ${savedAppointment.assignedTime || appointmentData.preferredTime}-এ clinic-এ আসবেন। আপনার token number ${savedAppointment.token || 'নির্ধারিত'}।`, ttsLanguage);
           } catch (error) {
             console.error('[edesy-media] Firestore save failed:', error.message);
             conversationStep = STEPS.CONFIRM;

@@ -16,6 +16,11 @@ const BENGALI_SAVE_FAILED =
   'দুঃখিত, অ্যাপয়েন্টমেন্টের অনুরোধটি এখন সংরক্ষণ করা যায়নি। পরে আবার চেষ্টা করুন।';
 const BENGALI_SAVE_SUCCESS =
   'ধন্যবাদ। আপনার appointment confirm করা হয়েছে। S.N. Tripathi-র clinic-এ আপনার appointment নোট করা হয়েছে।';
+function bookingSuccessMessage(savedAppointment) {
+  const time = savedAppointment?.assignedTime || savedAppointment?.preferredTime || 'নির্ধারিত সময়ে';
+  const token = savedAppointment?.token || 'নির্ধারিত';
+  return `${BENGALI_SAVE_SUCCESS} আপনি ${time}-এ clinic-এ আসবেন। আপনার token number ${token}।`;
+}
 
 const LANGUAGE_TO_TTS = {
   'bn-IN': 'bn-IN',
@@ -191,7 +196,7 @@ function attachMediaStreamServer(wss) {
 
         if (turn.shouldSave && !appointmentSaved) {
           try {
-            await saveAppointmentRequest({
+            const savedAppointment = await saveAppointmentRequest({
               ...appointmentData,
               language: turn.responseLanguage || 'bn',
               conversationId,
@@ -201,7 +206,7 @@ function attachMediaStreamServer(wss) {
             console.log(
               `[media-stream] Appointment request saved conversationId=${conversationId}`
             );
-            await speakText(BENGALI_SAVE_SUCCESS, 'bn-IN');
+            await speakText(bookingSuccessMessage(savedAppointment), 'bn-IN');
           } catch (error) {
             console.error('[media-stream] Firestore save failed:', error.message);
             await speakText(BENGALI_SAVE_FAILED, 'bn-IN');
@@ -303,6 +308,7 @@ function attachMediaStreamServer(wss) {
             msg.start?.customParameters?.callSid ||
             null;
           callerPhone = msg.start?.customParameters?.from || null;
+          const skipGreeting = msg.start?.customParameters?.skipGreeting === 'true';
           callSessionId = await startCallSession({ callSid, conversationId, callerPhone });
 
           console.log(
@@ -318,7 +324,7 @@ function attachMediaStreamServer(wss) {
 
           if (clinicConfig && isClinicAvailable(clinicConfig)) connectStt();
 
-          if (!greetingSent) {
+          if (!greetingSent && !skipGreeting) {
             greetingSent = true;
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
@@ -327,7 +333,7 @@ function attachMediaStreamServer(wss) {
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
               speakText(greeting, 'bn-IN');
             }, 0);
-          }
+          } else if (skipGreeting) greetingSent = true;
           break;
         }
 
