@@ -120,7 +120,7 @@ function maybeValidateTwilioSignature(req, res, next) {
  * Patient calls the Twilio number -> we answer and open a bidirectional Media Stream.
  * This does NOT place an outbound call to the doctor.
  */
-router.post('/voice', maybeValidateTwilioSignature, async (req, res) => {
+async function handleVoiceWebhook(req, res) {
   try {
     const callSid = req.body?.CallSid || 'unknown';
     const from = req.body?.From || 'unknown';
@@ -159,7 +159,11 @@ router.post('/voice', maybeValidateTwilioSignature, async (req, res) => {
     twiml.hangup();
     res.type('text/xml').status(200).send(twiml.toString());
   }
-});
+}
+
+// Twilio can be configured with either HTTP method for voice webhooks.
+router.post('/voice', maybeValidateTwilioSignature, handleVoiceWebhook);
+router.get('/voice', maybeValidateTwilioSignature, handleVoiceWebhook);
 
 /**
  * Places an outbound call using the configured Twilio number.
