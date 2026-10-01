@@ -48,9 +48,15 @@ function buildMediaStreamUrl(req) {
   return `${wsBase}/media-stream`;
 }
 
-function buildMediaStreamTwiml(req) {
+function buildMediaStreamTwiml(req, clinicConfig = null) {
   const twiml = new VoiceResponse();
-  twiml.play(`${env.voiceAudioBaseUrl}/audio/greeting.mp3`);
+  const clinicAvailable = !clinicConfig || isClinicAvailable(clinicConfig);
+  const audioName = clinicAvailable ? 'greeting.mp3' : 'clinic-closed.mp3';
+  twiml.play(`${env.voiceAudioBaseUrl}/audio/${audioName}`);
+  if (!clinicAvailable) {
+    twiml.hangup();
+    return twiml.toString();
+  }
   const connect = twiml.connect();
   const stream = connect.stream({ url: buildMediaStreamUrl(req) });
   stream.parameter({ name: 'from', value: req.body?.From || req.body?.from || '' });
@@ -126,6 +132,10 @@ router.post('/voice', maybeValidateTwilioSignature, async (req, res) => {
     const clinicConfig = await getClinicConfig().catch(() => null);
     const audioName = clinicConfig && isClinicAvailable(clinicConfig) ? 'greeting.mp3' : 'clinic-closed.mp3';
     twiml.play(`${env.voiceAudioBaseUrl}/audio/${audioName}`);
+    if (!clinicConfig || !isClinicAvailable(clinicConfig)) {
+      twiml.hangup();
+      return res.type('text/xml').status(200).send(twiml.toString());
+    }
     const connect = twiml.connect();
     const stream = connect.stream({
       url: streamUrl,
@@ -182,13 +192,20 @@ router.post('/make-call', async (req, res) => {
 
   try {
     const client = twilioClientFactory(accountSid, authToken);
+    const clinicConfig = await getClinicConfig().catch((error) => {
+      console.error('[twilio] Could not load clinic config for outbound call:', error.message);
+      return null;
+    });
     const call = await client.calls.create({
       to,
       from: phoneNumber,
       // Route outbound calls through the same bidirectional AI Media Stream
       // used by inbound calls. The old Gather flow only played Twilio's static
       // greeting and never reached Sarvam/Groq.
-      twiml: buildMediaStreamTwiml({ ...req, body: { ...(req.body || {}), To: to } }),
+      twiml: buildMediaStreamTwiml(
+        { ...req, body: { ...(req.body || {}), To: to } },
+        clinicConfig
+      ),
     });
 
     return res.status(201).json({
