@@ -192,20 +192,15 @@ router.post('/make-call', async (req, res) => {
 
   try {
     const client = twilioClientFactory(accountSid, authToken);
-    const clinicConfig = await getClinicConfig().catch((error) => {
-      console.error('[twilio] Could not load clinic config for outbound call:', error.message);
-      return null;
-    });
+    const voiceUrl = `${getPublicBaseUrl(req)}/voice`;
+    console.log(`[twilio] Creating outbound call with voice webhook url=${voiceUrl}`);
     const call = await client.calls.create({
       to,
       from: phoneNumber,
-      // Route outbound calls through the same bidirectional AI Media Stream
-      // used by inbound calls. The old Gather flow only played Twilio's static
-      // greeting and never reached Sarvam/Groq.
-      twiml: buildMediaStreamTwiml(
-        { ...req, body: { ...(req.body || {}), To: to } },
-        clinicConfig
-      ),
+      // Use the same webhook as inbound calls so Twilio reliably enters the
+      // clinic availability check and then opens the bidirectional stream.
+      url: voiceUrl,
+      method: 'POST',
     });
 
     return res.status(201).json({
