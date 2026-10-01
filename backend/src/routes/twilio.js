@@ -122,8 +122,9 @@ function maybeValidateTwilioSignature(req, res, next) {
  */
 async function handleVoiceWebhook(req, res) {
   try {
-    const callSid = req.body?.CallSid || 'unknown';
-    const from = req.body?.From || 'unknown';
+    const params = { ...(req.query || {}), ...(req.body || {}) };
+    const callSid = params.CallSid || params.callSid || 'unknown';
+    const from = params.From || params.from || 'unknown';
 
     console.log(`[twilio] Inbound call received callSid=${callSid} from=${from}`);
 
@@ -144,7 +145,7 @@ async function handleVoiceWebhook(req, res) {
     // Pass useful metadata into the WebSocket "start" event customParameters
     stream.parameter({ name: 'callSid', value: callSid });
     stream.parameter({ name: 'from', value: from });
-    stream.parameter({ name: 'to', value: req.body?.To || env.twilio.phoneNumber || '' });
+    stream.parameter({ name: 'to', value: params.To || params.to || env.twilio.phoneNumber || '' });
     stream.parameter({ name: 'skipGreeting', value: 'true' });
 
     res.type('text/xml').status(200).send(twiml.toString());
