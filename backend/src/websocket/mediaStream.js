@@ -63,6 +63,8 @@ function attachMediaStreamServer(wss) {
     let closed = false;
     let clinicConfig = null;
     let callSessionId = null;
+    const pendingSttAudio = [];
+    const MAX_PENDING_STT_CHUNKS = 150; // ~3 seconds of Twilio 20ms audio
 
     let appointmentData = {
       patientName: null,
@@ -88,6 +90,18 @@ function attachMediaStreamServer(wss) {
     const clearTwilioBuffer = () => {
       if (!streamSid) return;
       safeSend({ event: 'clear', streamSid });
+    };
+
+    const forwardAudioToStt = (payload) => {
+      if (!stt || !payload) return;
+      if (stt.ws.readyState === WebSocket.OPEN) {
+        stt.sendAudioBase64(payload);
+        return;
+      }
+      if (stt.ws.readyState === WebSocket.CONNECTING) {
+        pendingSttAudio.push(payload);
+        if (pendingSttAudio.length > MAX_PENDING_STT_CHUNKS) pendingSttAudio.shift();
+      }
     };
 
     const sendMulawToTwilio = (mulawBase64) => {
@@ -235,6 +249,7 @@ function attachMediaStreamServer(wss) {
 
       stt.ws.on('open', () => {
         console.log(`[media-stream] Sarvam STT connected conversationId=${conversationId}`);
+        while (pendingSttAudio.length) stt.sendAudioBase64(pendingSttAudio.shift());
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
         }, 20000);
@@ -335,12 +350,9 @@ function attachMediaStreamServer(wss) {
         }
 
         case 'media': {
-          if (stt && msg.media?.payload && !processingTurn) {
-            stt.sendAudioBase64(msg.media.payload);
-          } else if (stt && msg.media?.payload && processingTurn) {
-            // Still forward audio so VAD can detect barge-in after agent finishes
-            stt.sendAudioBase64(msg.media.payload);
-          }
+          // Buffer the first chunks while Sarvam's realtime socket is connecting;
+          // otherwise a caller who says their name immediately can be missed.
+          if (stt && msg.media?.payload) forwardAudioToStt(msg.media.payload);
           break;
         }
 
