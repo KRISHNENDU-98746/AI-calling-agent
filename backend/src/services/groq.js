@@ -60,11 +60,32 @@ function parseModelJson(content) {
   return parsed;
 }
 
-function normalizeTurn(parsed, existingData) {
+function inferPatientName(userText, existingData, history = []) {
+  if (existingData?.patientName) return existingData.patientName;
+  const text = cleanField(userText);
+  if (!text) return null;
+  const value = text.replace(/[।,!?.]+$/g, '').trim();
+  const hasNameMarker = /^(আমার নাম|নাম|আমি|my name is|name is|i am|i'm|this is)\s+/i.test(value);
+  const looksLikeOtherRequest = /(appointment|অ্যাপয়েন্টমেন্ট|সিরিয়াল|booking|কাল|আজ|tomorrow|date|সময়|সময়|টায়|টায়|pm|am|doctor|ডাক্তার|clinic|ক্লিনিক)/i.test(value);
+  if (!hasNameMarker && (history.length > 0 || looksLikeOtherRequest)) return null;
+  const candidate = value
+    .replace(/^(আমার নাম|নাম|আমি|my name is|name is|i am|i'm|this is)\s+/i, '')
+    .trim();
+  return candidate.length >= 2 ? candidate : null;
+}
+
+function normalizeTurn(parsed, existingData, userText, history) {
   const appointmentData = {};
   for (const field of APPOINTMENT_FIELDS) {
-    appointmentData[field] = cleanField(parsed[field]) || existingData?.[field] || null;
+    const aliases = {
+      patientName: ['patientName', 'patient_name'],
+      doctorName: ['doctorName', 'doctor_name'],
+      preferredDate: ['preferredDate', 'preferred_date'],
+      preferredTime: ['preferredTime', 'preferred_time'],
+    }[field];
+    appointmentData[field] = cleanField(aliases.map((key) => parsed[key]).find(Boolean)) || existingData?.[field] || null;
   }
+  appointmentData.patientName = appointmentData.patientName || inferPatientName(userText, existingData, history);
 
   const allFieldsPresent = APPOINTMENT_FIELDS.every((field) => appointmentData[field]);
   const confirmed = Boolean(parsed.confirmed) && allFieldsPresent;
@@ -137,7 +158,7 @@ async function generateAppointmentTurn({
 
   const data = await response.json();
   const content = data?.choices?.[0]?.message?.content;
-  return normalizeTurn(parseModelJson(content), appointmentData);
+  return normalizeTurn(parseModelJson(content), appointmentData, userText, history);
 }
 
 function setGroqFetchForTests(fetchImplementationForTests) {
