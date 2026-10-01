@@ -15,6 +15,7 @@ Twilio voice appointment agent with ElevenLabs TTS, Sarvam realtime STT, and a s
 
 - Dashboard: `https://frontend-omega-sable-33.vercel.app`
 - Backend: `https://doctor-34h2.onrender.com`
+- Dedicated audio host: `https://clinic-voice-audio.vercel.app`
 - Git remote: configured GitHub repository; push only when the user asks.
 
 ## Live call flow
@@ -22,6 +23,18 @@ Twilio voice appointment agent with ElevenLabs TTS, Sarvam realtime STT, and a s
 `Twilio/Exotel/Edesy audio → Sarvam STT → call session transcript → agent logic → ElevenLabs TTS → caller`
 
 The live audio path must stay fast. Do not add post-call LLM work to the live turn.
+
+### Twilio outbound call path
+
+`Dashboard /make-call → Twilio → /voice (GET or POST) → greeting MP3 → /media-stream → Sarvam STT → agent → ElevenLabs TTS`
+
+- Outbound calls use the backend `/voice` webhook, not inline TwiML.
+- `/voice` must accept both GET and POST because Twilio configurations can use either method.
+- The webhook returns `text/xml` and opens `wss://doctor-34h2.onrender.com/media-stream`.
+- Dedicated audio files are served from `https://clinic-voice-audio.vercel.app/audio/`.
+- If the clinic is closed and `testMode` is false, play `clinic-closed.mp3` and hang up; do not open STT.
+- If `testMode` is true, the agent remains available outside clinic hours for testing.
+- When STT is connecting, buffer the first few seconds of Twilio audio so the caller's name is not lost.
 
 ## Post-call flow
 
@@ -44,6 +57,7 @@ The live audio path must stay fast. Do not add post-call LLM work to the live tu
 - `backend/src/services/appointment.js` — Firestore appointment writes.
 - `backend/src/services/clinicConfig.js` — clinic/doctor/hours/test-mode config.
 - `backend/src/routes/admin.js` — dashboard config and appointment APIs.
+- `backend/src/routes/twilio.js` — outbound `/make-call`, GET/POST `/voice`, and Twilio media-stream TwiML.
 
 ## Product rules
 
@@ -58,6 +72,8 @@ The live audio path must stay fast. Do not add post-call LLM work to the live tu
 - `frontend/app.js` uses India timezone (`Asia/Kolkata`) for clinic schedule rendering.
 - Do not hardcode schedule slider position or time labels; derive them from `/admin/dashboard` config.
 - Fixed audio can later live under `frontend/public/audio/` and be served by Vercel. Cloudflare R2 is optional, not required yet.
+- Current audio files are deployed separately in the `clinic-voice-audio` Vercel project; keep dashboard hosting separate from Twilio audio hosting.
+- The dashboard has a `Test mode` toggle. It writes `testMode: true` to `clinic/config` through `/admin/config`.
 
 ## Environment variables
 
@@ -70,11 +86,23 @@ POST_CALL_PROCESSOR_ENABLED=true
 POST_CALL_POLL_MS=3000
 ```
 
+Audio hosting:
+
+```env
+VOICE_AUDIO_BASE_URL=https://clinic-voice-audio.vercel.app
+```
+
 See `backend/.env.example` for the non-secret list.
 
 ## Verification and deployment
 
 - Backend syntax check: run `node --check` on changed JS files.
+- Live smoke checks before a call:
+  - `GET https://doctor-34h2.onrender.com/health` returns 200.
+  - `GET` and `POST https://doctor-34h2.onrender.com/voice` return 200 XML.
+  - `/voice` XML contains `https://clinic-voice-audio.vercel.app/audio/greeting.mp3` and `wss://doctor-34h2.onrender.com/media-stream`.
+  - Dedicated MP3 URLs return 200 with `audio/mpeg`.
+  - For after-hours testing, confirm `/admin/dashboard` reports `testMode: true`.
 - Backend tests: `cd backend; npm test` (Windows sandbox may block child-process spawning with `EPERM`; report that clearly).
 - Frontend deploy: `cd frontend; npx vercel --prod --yes` when the user requests deployment.
 - Backend deploy: commit only scoped files, then `git push origin main` when the user requests GitHub push.
