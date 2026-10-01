@@ -17,6 +17,7 @@ function sendHealth(_req, res) {
     config: {
       publicBaseUrlSet: Boolean(env.publicBaseUrl),
       sarvamConfigured: Boolean(env.sarvam.apiKey),
+      elevenlabsConfigured: Boolean(env.elevenlabs.apiKey && env.elevenlabs.voiceId),
       firebaseConfigured: hasFirebaseCredentials(),
       exotelPhoneConfigured: Boolean(env.exotel.phoneNumber),
       twilioConfigured: Boolean(env.twilio.accountSid && env.twilio.authToken),

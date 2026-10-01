@@ -82,6 +82,13 @@ const env = {
     ttsModel: process.env.SARVAM_TTS_MODEL || 'bulbul:v3',
   },
 
+  elevenlabs: {
+    apiKey: process.env.ELEVENLABS_API_KEY || '',
+    voiceId: process.env.ELEVENLABS_VOICE_ID || '',
+    model: process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
+    baseUrl: (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/$/, ''),
+  },
+
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || '',
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',

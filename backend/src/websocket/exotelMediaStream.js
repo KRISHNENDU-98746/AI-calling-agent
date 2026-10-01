@@ -1,10 +1,7 @@
 const { WebSocket } = require('ws');
 const { randomUUID } = require('crypto');
-const {
-  createRealtimeSttConnection,
-  textToSpeech,
-  FALLBACK_SPEECH,
-} = require('../services/sarvam');
+const { createRealtimeSttConnection } = require('../services/sarvam');
+const { textToSpeech, FALLBACK_SPEECH } = require('../services/elevenlabs');
 const {
   processConversationTurn,
   getGreetingMessage,
