@@ -14,6 +14,7 @@ const {
 } = require('../services/conversation');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
+const { startCallSession, appendTranscript, finishCallSession } = require('../services/callSession');
 
 const LANGUAGE_TO_TTS = {
   'bn-IN': 'bn-IN',
@@ -82,6 +83,7 @@ function attachExotelMediaStreamServer(wss) {
     let closed = false;
     let mediaSequence = 1;
     let mediaChunk = 1;
+    let callSessionId = null;
 
     let conversationStep = STEPS.ASK_NAME;
     let appointmentData = { ...EMPTY_APPOINTMENT };
@@ -222,6 +224,7 @@ function attachExotelMediaStreamServer(wss) {
     const cleanup = (reason = 'unknown') => {
       if (closed) return;
       closed = true;
+      if (callSessionId) finishCallSession({ callId: callSessionId }).catch(() => {});
       speakGeneration += 1;
       botSpeaking = false;
 
@@ -252,6 +255,7 @@ function attachExotelMediaStreamServer(wss) {
 
       try {
         console.log(`[EXOTEL] Transcript: ${text}`);
+        appendTranscript({ callId: callSessionId, speaker: 'user', text }).catch(() => {});
 
         if (detectedLanguage) {
           ttsLanguage = mapLanguageForTts(detectedLanguage);
@@ -280,6 +284,7 @@ function attachExotelMediaStreamServer(wss) {
         if (turn.detectedLanguage) {
           ttsLanguage = mapLanguageForTts(turn.detectedLanguage);
         }
+        appendTranscript({ callId: callSessionId, speaker: 'assistant', text: turn.response }).catch(() => {});
 
         console.log(
           `[EXOTEL] Agent response generated step=${conversationStep} ready=${Boolean(
@@ -403,6 +408,7 @@ function attachExotelMediaStreamServer(wss) {
           streamSid = msg.start?.stream_sid || msg.stream_sid || null;
           callSid = msg.start?.call_sid || null;
           callerPhone = msg.start?.from || msg.start?.custom_parameters?.from || null;
+          callSessionId = await startCallSession({ callSid, conversationId, callerPhone });
           streamStartedAt = Date.now();
 
           console.log(

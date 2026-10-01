@@ -15,6 +15,7 @@ async function saveAppointmentRequest(data) {
     conversationId,
     callSid = null,
     source = 'voice_agent',
+    idempotencyKey = null,
   } = data;
 
   if (!patientName || !doctorName || !preferredDate || !preferredTime) {
@@ -22,7 +23,7 @@ async function saveAppointmentRequest(data) {
   }
 
   const db = getFirestore();
-  const docRef = db.collection('appointments').doc();
+  const docRef = db.collection('appointments').doc(idempotencyKey || undefined);
 
   const appointment = {
     patientName,

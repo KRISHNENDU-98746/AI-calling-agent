@@ -9,8 +9,9 @@ const { generateAppointmentTurn } = require('../services/groq');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
 const { getClinicConfig, isClinicAvailable } = require('../services/clinicConfig');
+const { startCallSession, appendTranscript, finishCallSession } = require('../services/callSession');
 
-const BENGALI_GREETING = 'নমস্কার। আমি ক্লিনিকের অ্যাপয়েন্টমেন্ট সহকারী। আপনার নাম বলবেন?';
+const BENGALI_GREETING = 'নমস্কার, আমি S. N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নামটা বলবেন?';
 const BENGALI_SAVE_FAILED =
   'দুঃখিত, অ্যাপয়েন্টমেন্টের অনুরোধটি এখন সংরক্ষণ করা যায়নি। পরে আবার চেষ্টা করুন।';
 const BENGALI_SAVE_SUCCESS =
@@ -59,6 +60,7 @@ function attachMediaStreamServer(wss) {
     let appointmentSaved = false;
     let closed = false;
     let clinicConfig = null;
+    let callSessionId = null;
 
     let appointmentData = {
       patientName: null,
@@ -122,6 +124,8 @@ function attachMediaStreamServer(wss) {
       if (closed) return;
       closed = true;
 
+      if (callSessionId) finishCallSession({ callId: callSessionId }).catch((error) => console.error('[media-stream] post-call enqueue failed:', error.message));
+
       if (pingTimer) {
         clearInterval(pingTimer);
         pingTimer = null;
@@ -148,6 +152,7 @@ function attachMediaStreamServer(wss) {
       clearTwilioBuffer();
 
       try {
+        appendTranscript({ callId: callSessionId, speaker: 'user', text }).catch(() => {});
         if (!clinicConfig || !isClinicAvailable(clinicConfig)) {
           await speakText(clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।', 'bn-IN');
           return;
@@ -182,6 +187,7 @@ function attachMediaStreamServer(wss) {
           { role: 'user', content: text },
           { role: 'assistant', content: turn.reply }
         );
+        appendTranscript({ callId: callSessionId, speaker: 'assistant', text: turn.reply }).catch(() => {});
 
         if (turn.shouldSave && !appointmentSaved) {
           try {
@@ -297,6 +303,7 @@ function attachMediaStreamServer(wss) {
             msg.start?.customParameters?.callSid ||
             null;
           callerPhone = msg.start?.customParameters?.from || null;
+          callSessionId = await startCallSession({ callSid, conversationId, callerPhone });
 
           console.log(
             `[media-stream] Stream started streamSid=${streamSid || 'unknown'} callSid=${
@@ -316,7 +323,7 @@ function attachMediaStreamServer(wss) {
             // Small delay so Twilio stream is fully ready
             setTimeout(() => {
               const greeting = clinicConfig && isClinicAvailable(clinicConfig)
-                ? (clinicConfig.agentGreeting || 'আমি S.N. Tripathi-র clinic থেকে বলছি। আমি আপনাকে appointment লিখতে সাহায্য করব। আপনার নাম বলবেন?')
+                ? (clinicConfig.agentGreeting || BENGALI_GREETING)
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
               speakText(greeting, 'bn-IN');
             }, 0);

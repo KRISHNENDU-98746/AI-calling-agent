@@ -13,6 +13,21 @@ function apiHeaders() { return { 'Content-Type': 'application/json', ...(API_KEY
 async function api(path, options = {}) { const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...apiHeaders(), ...(options.headers || {}) } }); if (!response.ok) throw new Error(`API ${response.status}`); return response.json(); }
 function appointmentTime(value = '') { const match = String(value).match(/(\d{1,2}):(\d{2})/); if (!match) return { time: value || '--:--', period: '' }; const hour = Number(match[1]); return { time: `${String(hour > 12 ? hour - 12 : hour).padStart(2, '0')}:${match[2]}`, period: hour >= 12 ? 'PM' : 'AM' }; }
 function isWithinHours(config) { const toMinutes = (value) => { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }; const start = toMinutes(config?.hours?.start); const end = toMinutes(config?.hours?.end); if (start === null || end === null) return true; const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date()); const now = Number(parts.find((part) => part.type === 'hour')?.value || 0) * 60 + Number(parts.find((part) => part.type === 'minute')?.value || 0); return start <= end ? now >= start && now < end : now >= start || now < end; }
+function indiaMinutes() { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date()); return Number(parts.find((part) => part.type === 'hour')?.value || 0) * 60 + Number(parts.find((part) => part.type === 'minute')?.value || 0); }
+function clockMinutes(value) { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
+function scheduleClock(value) { const minutes = clockMinutes(value); if (minutes === null) return value || '--:--'; const h = Math.floor(minutes / 60); return `${String(h || 12).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; }
+function schedulePeriod(minutes) { if (minutes < 12 * 60) return 'Morning'; if (minutes < 17 * 60) return 'Afternoon'; return 'Evening'; }
+function updateScheduleVisual(config) {
+  const start = clockMinutes(config?.hours?.start); const end = clockMinutes(config?.hours?.end);
+  const timeRow = document.querySelector('.schedule-track .time-row'); const slotRow = document.querySelector('.schedule-track .slot-row'); const fill = document.querySelector('.schedule-track .track-fill');
+  if (start === null || end === null || !timeRow || !slotRow || !fill) return;
+  const midpoint = start + ((end >= start ? end : end + 1440) - start) / 2;
+  const points = [start, midpoint, end].map((value) => value % 1440);
+  timeRow.innerHTML = points.map(scheduleClock).map((label) => `<span>${label}</span>`).join('');
+  slotRow.innerHTML = points.map((value) => `<span>${schedulePeriod(value)}</span>`).join('');
+  const now = indiaMinutes(); const duration = end >= start ? end - start : end + 1440 - start; let elapsed = now - start; if (elapsed < 0 && end < start) elapsed += 1440;
+  const progress = Math.max(0, Math.min(100, duration ? (elapsed / duration) * 100 : 0)); fill.style.width = `${progress}%`; fill.setAttribute('aria-label', `Current India time position: ${scheduleClock(now)}`);
+}
 function renderAppointments(items, demoIfEmpty = false) {
   const source = items.length ? items.slice(0, 5) : (demoIfEmpty ? demoAppointments : []);
   if (!source.length) { document.querySelector('#appointmentList').innerHTML = '<div class="empty-state">No appointments yet. New requests will appear here.</div>'; return; }
@@ -33,6 +48,7 @@ function applyConfig(config) {
   const specialty = document.querySelector('.doctor-line span:not(.available-badge)'); if (specialty) specialty.textContent = config.specialty || 'General physician';
   const available = document.querySelector('.available-badge'); if (available) available.innerHTML = live ? '<i></i> Available today' : '<i style="background:#c58e6c"></i> Not available';
   const hours = document.querySelector('.hours-summary'); if (hours && config.hours) hours.innerHTML = `<span><b>${config.hours.start}</b> Start</span><span><b>${config.hours.end}</b> End</span><span><b>${config.appointmentDurationMinutes} min</b> per visit</span>`;
+  updateScheduleVisual(config);
   const assistant = document.querySelector('.agent-copy strong'); if (assistant) assistant.textContent = `${config.doctorName || 'Doctor'}’s assistant`;
 }
 let currentConfig = null;

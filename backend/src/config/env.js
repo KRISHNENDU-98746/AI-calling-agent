@@ -49,6 +49,11 @@ const env = {
     baseUrl: (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, ''),
   },
 
+  postCall: {
+    enabled: !['0', 'false', 'no', 'off'].includes(String(process.env.POST_CALL_PROCESSOR_ENABLED || 'true').toLowerCase()),
+    pollMs: Number(process.env.POST_CALL_POLL_MS) || 3000,
+  },
+
   exotel: {
     sid: process.env.EXOTEL_SID || '',
     apiKey: process.env.EXOTEL_API_KEY || '',

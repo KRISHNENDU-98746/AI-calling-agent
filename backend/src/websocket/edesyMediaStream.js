@@ -14,6 +14,7 @@ const {
 } = require('../services/conversation');
 const { saveAppointmentRequest } = require('../services/appointment');
 const { env } = require('../config/env');
+const { startCallSession, appendTranscript, finishCallSession } = require('../services/callSession');
 
 const LANGUAGE_TO_TTS = {
   'bn-IN': 'bn-IN',
@@ -74,6 +75,7 @@ function attachEdesyMediaStreamServer(wss) {
     let appointmentSaved = false;
     let closed = false;
     let markCounter = 0;
+    let callSessionId = null;
 
     let conversationStep = STEPS.ASK_NAME;
     let appointmentData = { ...EMPTY_APPOINTMENT };
@@ -155,6 +157,7 @@ function attachEdesyMediaStreamServer(wss) {
     const cleanup = () => {
       if (closed) return;
       closed = true;
+      if (callSessionId) finishCallSession({ callId: callSessionId }).catch(() => {});
 
       if (pingTimer) {
         clearInterval(pingTimer);
@@ -182,6 +185,7 @@ function attachEdesyMediaStreamServer(wss) {
       killAudio();
 
       try {
+        appendTranscript({ callId: callSessionId, speaker: 'user', text }).catch(() => {});
         if (detectedLanguage) {
           ttsLanguage = mapLanguageForTts(detectedLanguage);
         }
@@ -209,6 +213,7 @@ function attachEdesyMediaStreamServer(wss) {
         if (turn.detectedLanguage) {
           ttsLanguage = mapLanguageForTts(turn.detectedLanguage);
         }
+        appendTranscript({ callId: callSessionId, speaker: 'assistant', text: turn.response }).catch(() => {});
 
         if (turn.appointmentReady && !appointmentSaved) {
           try {
@@ -309,6 +314,7 @@ function attachEdesyMediaStreamServer(wss) {
     const handleMetadata = (meta) => {
       callSid = meta.call_sid || meta.callSid || null;
       callerPhone = meta.from || null;
+      startCallSession({ callSid, conversationId, callerPhone }).then((id) => { callSessionId = id; }).catch(() => {});
       if (meta.sampleRate) {
         sampleRate = Number(meta.sampleRate) || sampleRate;
         frameBytes = frameBytesForSampleRate(sampleRate);

@@ -13,10 +13,12 @@ const exotelRouter = require('./routes/exotel');
 const internalRouter = require('./routes/internal');
 const adminRouter = require('./routes/admin');
 const { attachMediaStreamServer } = require('./websocket/mediaStream');
+const { startPostCallWorker } = require('./services/postCallWorker');
 const { attachExotelMediaStreamServer } = require('./websocket/exotelMediaStream');
 const { attachEdesyMediaStreamServer } = require('./websocket/edesyMediaStream');
 
 const app = express();
+startPostCallWorker();
 
 app.set('trust proxy', 1);
 
