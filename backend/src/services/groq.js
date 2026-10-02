@@ -14,7 +14,7 @@ Scope:
 - Help only with creating an appointment booking request.
 - Collect patient name, preferred date, and preferred time. The doctor is already configured; never ask the caller to choose or provide a doctor name.
 - Never give medical advice, diagnoses, prescriptions, treatment recommendations, or emergency guidance. If asked, briefly say you can only help with appointment requests and continue with the missing booking detail.
-- Say the appointment is confirmed only after the caller explicitly confirms all details and the system successfully saves it.
+- Never claim an appointment is confirmed before the caller explicitly confirms all details and the system successfully saves it.
 
 Language and style:
 - Understand Bengali, Banglish, Hindi, and English.
@@ -60,18 +60,26 @@ function parseModelJson(content) {
   return parsed;
 }
 
+const NAME_MARKER_REGEX = /^(আমার নাম হল|আমার নাম হচ্ছে|আমার নাম হয়|আমার নাম|মোর নাম|আমার নামটা|নাম|আমি|amar nam hocche|amar nam holo|amar naam holo|amar nam is|amar name is|amar nam|amar naam|amar name|mera naam hai|mera naam|naam|nam|my name is|name is|i am|i'm|this is)\s+/i;
+
 function inferPatientName(userText, existingData, history = []) {
   if (existingData?.patientName) return existingData.patientName;
   const text = cleanField(userText);
   if (!text) return null;
   const value = text.replace(/[।,!?.]+$/g, '').trim();
-  const hasNameMarker = /^(আমার নাম|নাম|আমি|my name is|name is|i am|i'm|this is)\s+/i.test(value);
+
+  const hasNameMarker = NAME_MARKER_REGEX.test(value);
   const looksLikeOtherRequest = /(appointment|অ্যাপয়েন্টমেন্ট|সিরিয়াল|booking|কাল|আজ|tomorrow|date|সময়|সময়|টায়|টায়|pm|am|doctor|ডাক্তার|clinic|ক্লিনিক)/i.test(value);
-  if (!hasNameMarker && (history.length > 0 || looksLikeOtherRequest)) return null;
-  const candidate = value
-    .replace(/^(আমার নাম|নাম|আমি|my name is|name is|i am|i'm|this is)\s+/i, '')
-    .trim();
-  return candidate.length >= 2 ? candidate : null;
+
+  const lastAssistantMsg = history.filter((h) => h.role === 'assistant').pop()?.content || '';
+  const askedForName = history.length <= 1 || /(নাম|name|who|কাহারা|বলবেন)/i.test(lastAssistantMsg);
+
+  if (!hasNameMarker && !askedForName && (history.length > 1 || looksLikeOtherRequest)) return null;
+
+  const candidate = value.replace(NAME_MARKER_REGEX, '').trim();
+  const cleanCandidate = candidate.split(/(,|\b(appointment|অ্যাপয়েন্টমেন্ট|বুক|booking|কাল|আজ|tomorrow)\b)/i)[0].trim();
+
+  return cleanCandidate.length >= 2 ? cleanCandidate : null;
 }
 
 function normalizeTurn(parsed, existingData, userText, history) {

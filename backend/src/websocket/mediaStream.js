@@ -347,6 +347,15 @@ function attachMediaStreamServer(wss) {
 
           if (clinicConfig && isClinicAvailable(clinicConfig)) connectStt();
 
+          const initialGreeting = clinicConfig && isClinicAvailable(clinicConfig)
+            ? (clinicConfig.agentGreeting || BENGALI_GREETING)
+            : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
+
+          if (conversationHistory.length === 0) {
+            conversationHistory.push({ role: 'assistant', content: initialGreeting });
+            appendTranscript({ callId: callSessionId, speaker: 'assistant', text: initialGreeting }).catch(() => {});
+          }
+
           if (!greetingSent && !skipGreeting) {
             greetingSent = true;
             // Small delay so Twilio stream is fully ready
@@ -354,7 +363,7 @@ function attachMediaStreamServer(wss) {
               const greeting = clinicConfig && isClinicAvailable(clinicConfig)
                 ? (clinicConfig.agentGreeting || BENGALI_GREETING)
                 : (clinicConfig?.clinicClosedMessage || 'দুঃখিত, আজ clinic বন্ধ। অনুগ্রহ করে অন্য দিনে call করুন।');
-              speakText(greeting, 'bn-IN');
+              speakText(initialGreeting, 'bn-IN');
             }, 0);
           } else if (skipGreeting) greetingSent = true;
           break;

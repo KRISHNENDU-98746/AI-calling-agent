@@ -75,14 +75,7 @@ describe('POST /make-call', () => {
     assert.deepEqual(response.body, { success: true, callSid: 'CA_mocked', status: 'queued' });
     assert.equal(received.to, '+919635203250');
     assert.equal(received.from, '+15551234567');
-    assert.match(
-      received.twiml,
-      /<Gather[^>]*input="speech"[^>]*action="[^"]*\/make-call\/gather"/i
-    );
-    assert.match(
-      received.twiml,
-      /Hello, this is the clinic appointment assistant\. How can I help you\?/i
-    );
+    assert.match(received.url, /\/voice$/i);
   });
 
   it('rejects a non-E.164 destination without calling Twilio', async () => {

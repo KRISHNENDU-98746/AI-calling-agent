@@ -51,7 +51,7 @@ function cleanUtterance(text) {
 function stripLeadingLabels(text) {
   return cleanUtterance(text)
     .replace(
-      /^(my name is|i am|i'm|name is|this is|মোর নাম|আমার নাম|মেरा नाम|मेरा नाम है|नाम है)\s+/i,
+      /^(amar nam hocche|amar nam holo|amar naam holo|amar nam is|amar name is|amar nam|amar naam|amar name|mera naam hai|mera naam|naam|nam|my name is|i am|i'm|name is|this is|মোর নাম|আমার নাম|আমার নাম হল|আমার নাম হচ্ছে|মেরা নাম|मेरा नाम है|नाम है)\s+/i,
       ''
     )
     .replace(/^(doctor|dr\.?|ডাক্তার|डॉक्टर)\s+/i, '')
