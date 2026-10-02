@@ -16,7 +16,8 @@ function sendHealth(_req, res) {
     },
     config: {
       publicBaseUrlSet: Boolean(env.publicBaseUrl),
-      sarvamConfigured: Boolean(env.sarvam.apiKey),
+      sarvamConfigured: false,
+      elevenlabsSttConfigured: Boolean(env.elevenlabs.apiKey),
       elevenlabsConfigured: Boolean(env.elevenlabs.apiKey && env.elevenlabs.voiceId),
       firebaseConfigured: hasFirebaseCredentials(),
       exotelPhoneConfigured: Boolean(env.exotel.phoneNumber),

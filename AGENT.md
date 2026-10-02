@@ -2,11 +2,11 @@
 
 ## Project goal
 
-Twilio voice appointment agent with ElevenLabs TTS, Sarvam realtime STT, and a small clinic admin dashboard.
+Twilio voice appointment agent with ElevenLabs realtime STT/TTS and a small clinic admin dashboard.
 
 ## Repository layout
 
-- `backend/` — Node.js/Express API, Twilio/Exotel/Edesy WebSockets, Sarvam STT, ElevenLabs TTS, Groq turn logic, Firebase/Firestore.
+- `backend/` — Node.js/Express API, Twilio/Exotel/Edesy WebSockets, ElevenLabs Scribe STT/TTS, Groq turn logic, Firebase/Firestore.
 - `frontend/` — static dashboard deployed on Vercel.
 - `videosdk-agent/` — separate user work; do not modify or stage unless explicitly requested.
 - `.venv/` — local environment; never stage.
@@ -20,13 +20,13 @@ Twilio voice appointment agent with ElevenLabs TTS, Sarvam realtime STT, and a s
 
 ## Live call flow
 
-`Twilio/Exotel/Edesy audio → Sarvam STT → call session transcript → agent logic → ElevenLabs TTS → caller`
+`Twilio/Exotel/Edesy audio → ElevenLabs Scribe STT → call session transcript → agent logic → ElevenLabs TTS → caller`
 
 The live audio path must stay fast. Do not add post-call LLM work to the live turn.
 
 ### Twilio outbound call path
 
-`Dashboard /make-call → Twilio → /voice (GET or POST) → greeting MP3 → /media-stream → Sarvam STT → agent → ElevenLabs TTS`
+`Dashboard /make-call → Twilio → /voice (GET or POST) → greeting MP3 → /media-stream → ElevenLabs Scribe STT → agent → ElevenLabs TTS`
 
 - Outbound calls use the backend `/voice` webhook, not inline TwiML.
 - `/voice` must accept both GET and POST because Twilio configurations can use either method.
@@ -52,7 +52,7 @@ The live audio path must stay fast. Do not add post-call LLM work to the live tu
 - `backend/src/websocket/edesyMediaStream.js` — Edesy stream.
 - `backend/src/services/groq.js` — live structured turn generation and intent hint.
 - `backend/src/services/conversation.js` — deterministic conversation fallback.
-- `backend/src/services/sarvam.js` — realtime STT.
+- `backend/src/services/elevenlabsStt.js` — realtime Scribe v2 STT over WebSocket.
 - `backend/src/services/elevenlabs.js` — live TTS; returns raw `ulaw_8000` audio for telephony.
 - `backend/src/services/appointment.js` — Firestore appointment writes.
 - `backend/src/services/clinicConfig.js` — clinic/doctor/hours/test-mode config.
@@ -79,7 +79,7 @@ The live audio path must stay fast. Do not add post-call LLM work to the live tu
 
 Keep secrets only in Render/Vercel environment settings or local `.env`; never commit them.
 
-Required live-call variables include `SARVAM_API_KEY` (STT), `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, Firebase credentials, and Groq credentials. Post-call settings:
+Required live-call variables include `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, Firebase credentials, and Groq credentials. Sarvam is not used in the live call path. Post-call settings:
 
 ```env
 POST_CALL_PROCESSOR_ENABLED=true

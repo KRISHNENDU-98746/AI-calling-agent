@@ -1,6 +1,6 @@
 const { WebSocket } = require('ws');
 const { randomUUID } = require('crypto');
-const { createRealtimeSttConnection } = require('../services/sarvam');
+const { createRealtimeSttConnection } = require('../services/elevenlabsStt');
 const { textToSpeech, FALLBACK_SPEECH } = require('../services/elevenlabs');
 const { generateAppointmentTurn } = require('../services/groq');
 const { saveAppointmentRequest } = require('../services/appointment');
@@ -30,12 +30,12 @@ const LANGUAGE_TO_TTS = {
 };
 
 function mapLanguageForTts(detectedLanguage) {
-  if (!detectedLanguage) return env.sarvam.ttsLanguage;
-  return LANGUAGE_TO_TTS[detectedLanguage] || env.sarvam.ttsLanguage;
+  if (!detectedLanguage) return 'bn-IN';
+  return LANGUAGE_TO_TTS[detectedLanguage] || 'bn-IN';
 }
 
 function extractMulawPayload(audioBuffer) {
-  // If Sarvam returns a WAV container despite mulaw codec, strip the 44-byte header.
+  // Strip a WAV container if a future telephony provider returns one.
   if (
     audioBuffer.length > 44 &&
     audioBuffer.toString('ascii', 0, 4) === 'RIFF' &&
@@ -234,8 +234,8 @@ function attachMediaStreamServer(wss) {
     const connectStt = () => {
       try {
         stt = createRealtimeSttConnection({
-          languageCode: env.sarvam.sttLanguage || 'auto',
-          mode: env.sarvam.sttMode || 'codemix',
+          languageCode: env.elevenlabs.sttLanguage || '',
+          model: env.elevenlabs.sttModel,
           encoding: 'mulaw',
           sampleRate: 8000,
           streamType: 'fast',
@@ -248,7 +248,7 @@ function attachMediaStreamServer(wss) {
       }
 
       stt.ws.on('open', () => {
-        console.log(`[media-stream] Sarvam STT connected conversationId=${conversationId}`);
+        console.log(`[media-stream] ElevenLabs STT connected conversationId=${conversationId}`);
         while (pendingSttAudio.length) stt.sendAudioBase64(pendingSttAudio.shift());
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
@@ -263,7 +263,7 @@ function attachMediaStreamServer(wss) {
           return;
         }
 
-        const eventName = message.event || message.type;
+        const eventName = message.event || message.type || message.message_type;
 
         if (eventName === 'vad.speech_start') {
           // Barge-in: stop current agent audio when caller starts speaking
@@ -271,7 +271,7 @@ function attachMediaStreamServer(wss) {
           return;
         }
 
-        if (eventName === 'transcript.final') {
+        if (eventName === 'transcript.final' || eventName === 'committed_transcript') {
           const transcript = message.text || message.transcript || '';
           const detectedLanguage = message.language || message.language_code || null;
           handleFinalTranscript(transcript, detectedLanguage).catch((error) => {
@@ -280,24 +280,22 @@ function attachMediaStreamServer(wss) {
           return;
         }
 
-        if (eventName === 'error') {
+        if (eventName === 'error' || eventName === 'rate_limited' || eventName === 'unaccepted_terms') {
           console.error(
-            `[media-stream] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
-              message.is_fatal
-            )}`
+            `[media-stream] ElevenLabs STT error type=${eventName} message=${message.error || message.message || message.warning || 'unknown'}`
           );
-          if (message.is_fatal) {
+          if (message.is_fatal || eventName !== 'error') {
             speakText(FALLBACK_SPEECH, 'en-IN');
           }
         }
       });
 
       stt.ws.on('error', (error) => {
-        console.error('[media-stream] Sarvam STT socket error:', error.message);
+        console.error('[media-stream] ElevenLabs STT socket error:', error.message);
       });
 
       stt.ws.on('close', () => {
-        console.log(`[media-stream] Sarvam STT closed conversationId=${conversationId}`);
+        console.log(`[media-stream] ElevenLabs STT closed conversationId=${conversationId}`);
       });
     };
 
@@ -350,7 +348,7 @@ function attachMediaStreamServer(wss) {
         }
 
         case 'media': {
-          // Buffer the first chunks while Sarvam's realtime socket is connecting;
+          // Buffer the first chunks while ElevenLabs' realtime socket is connecting;
           // otherwise a caller who says their name immediately can be missed.
           if (stt && msg.media?.payload) forwardAudioToStt(msg.media.payload);
           break;

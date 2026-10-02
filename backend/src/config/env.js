@@ -86,7 +86,10 @@ const env = {
     apiKey: process.env.ELEVENLABS_API_KEY || '',
     voiceId: process.env.ELEVENLABS_VOICE_ID || '',
     model: process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
+    sttModel: process.env.ELEVENLABS_STT_MODEL || 'scribe_v2_realtime',
+    sttLanguage: process.env.ELEVENLABS_STT_LANGUAGE || '',
     baseUrl: (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/$/, ''),
+    sttBaseUrl: (process.env.ELEVENLABS_STT_BASE_URL || 'wss://api.elevenlabs.io').replace(/\/$/, ''),
   },
 
   firebase: {
@@ -103,7 +106,7 @@ const env = {
 
 // Shared requirements for Exotel and Twilio live call paths.
 const CRITICAL_FOR_CALLS = [
-  ['SARVAM_API_KEY', env.sarvam.apiKey],
+  ['ELEVENLABS_API_KEY', env.elevenlabs.apiKey],
   ['FIREBASE_PROJECT_ID', env.firebase.projectId],
   ['FIREBASE_CLIENT_EMAIL', env.firebase.clientEmail],
   ['FIREBASE_PRIVATE_KEY', env.firebase.privateKey],

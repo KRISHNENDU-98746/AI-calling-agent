@@ -1,6 +1,6 @@
 const { WebSocket } = require('ws');
 const { randomUUID } = require('crypto');
-const { createRealtimeSttConnection } = require('../services/sarvam');
+const { createRealtimeSttConnection } = require('../services/elevenlabsStt');
 const { textToSpeech, FALLBACK_SPEECH } = require('../services/elevenlabs');
 const {
   processConversationTurn,
@@ -28,8 +28,8 @@ const DEFAULT_SAMPLE_RATE = 16000;
 const DEFAULT_FRAME_BYTES = 640;
 
 function mapLanguageForTts(detectedLanguage) {
-  if (!detectedLanguage) return env.sarvam.ttsLanguage;
-  return LANGUAGE_TO_TTS[detectedLanguage] || env.sarvam.ttsLanguage;
+  if (!detectedLanguage) return 'bn-IN';
+  return LANGUAGE_TO_TTS[detectedLanguage] || 'bn-IN';
 }
 
 function stripWavHeaderIfPresent(audioBuffer) {
@@ -76,7 +76,7 @@ function attachEdesyMediaStreamServer(wss) {
 
     let conversationStep = STEPS.ASK_NAME;
     let appointmentData = { ...EMPTY_APPOINTMENT };
-    let ttsLanguage = env.sarvam.ttsLanguage;
+    let ttsLanguage = 'bn-IN';
 
     console.log(`[edesy-media] Client connected conversationId=${conversationId}`);
 
@@ -243,8 +243,8 @@ function attachEdesyMediaStreamServer(wss) {
     const connectStt = () => {
       try {
         stt = createRealtimeSttConnection({
-          languageCode: env.sarvam.sttLanguage || 'auto',
-          mode: env.sarvam.sttMode || 'codemix',
+          languageCode: env.elevenlabs.sttLanguage || '',
+          model: env.elevenlabs.sttModel,
           encoding: 'linear16',
           sampleRate,
           streamType: 'fast',
@@ -257,7 +257,7 @@ function attachEdesyMediaStreamServer(wss) {
       }
 
       stt.ws.on('open', () => {
-        console.log(`[edesy-media] Sarvam STT connected conversationId=${conversationId}`);
+        console.log(`[edesy-media] ElevenLabs STT connected conversationId=${conversationId}`);
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
         }, 20000);
@@ -271,14 +271,14 @@ function attachEdesyMediaStreamServer(wss) {
           return;
         }
 
-        const eventName = message.event || message.type;
+        const eventName = message.event || message.type || message.message_type;
 
         if (eventName === 'vad.speech_start') {
           killAudio();
           return;
         }
 
-        if (eventName === 'transcript.final') {
+        if (eventName === 'transcript.final' || eventName === 'committed_transcript') {
           const transcript = message.text || message.transcript || '';
           const detectedLanguage = message.language || message.language_code || null;
           handleFinalTranscript(transcript, detectedLanguage).catch((error) => {
@@ -289,7 +289,7 @@ function attachEdesyMediaStreamServer(wss) {
 
         if (eventName === 'error') {
           console.error(
-            `[edesy-media] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
+            `[edesy-media] ElevenLabs STT error code=${message.code || 'unknown'} fatal=${Boolean(
               message.is_fatal
             )}`
           );
@@ -300,11 +300,11 @@ function attachEdesyMediaStreamServer(wss) {
       });
 
       stt.ws.on('error', (error) => {
-        console.error('[edesy-media] Sarvam STT socket error:', error.message);
+        console.error('[edesy-media] ElevenLabs STT socket error:', error.message);
       });
 
       stt.ws.on('close', () => {
-        console.log(`[edesy-media] Sarvam STT closed conversationId=${conversationId}`);
+        console.log(`[edesy-media] ElevenLabs STT closed conversationId=${conversationId}`);
       });
     };
 

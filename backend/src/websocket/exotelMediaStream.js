@@ -1,6 +1,6 @@
 const { WebSocket } = require('ws');
 const { randomUUID } = require('crypto');
-const { createRealtimeSttConnection } = require('../services/sarvam');
+const { createRealtimeSttConnection } = require('../services/elevenlabsStt');
 const { textToSpeech, FALLBACK_SPEECH } = require('../services/elevenlabs');
 const {
   processConversationTurn,
@@ -34,8 +34,8 @@ function sleep(ms) {
 }
 
 function mapLanguageForTts(detectedLanguage) {
-  if (!detectedLanguage) return env.sarvam.ttsLanguage;
-  return LANGUAGE_TO_TTS[detectedLanguage] || env.sarvam.ttsLanguage;
+  if (!detectedLanguage) return 'bn-IN';
+  return LANGUAGE_TO_TTS[detectedLanguage] || 'bn-IN';
 }
 
 function stripWavHeaderIfPresent(audioBuffer) {
@@ -84,7 +84,7 @@ function attachExotelMediaStreamServer(wss) {
 
     let conversationStep = STEPS.ASK_NAME;
     let appointmentData = { ...EMPTY_APPOINTMENT };
-    let ttsLanguage = env.sarvam.ttsLanguage;
+    let ttsLanguage = 'bn-IN';
     const sampleRate = parseSampleRate(req?.url || '');
     let streamStartedAt = Date.now();
     let speakGeneration = 0;
@@ -320,9 +320,9 @@ function attachExotelMediaStreamServer(wss) {
     const connectStt = () => {
       try {
         stt = createRealtimeSttConnection({
-          languageCode: env.sarvam.sttLanguage || 'auto',
-          mode: env.sarvam.sttMode || 'codemix',
-          // Exotel Voicebot: raw/slin = signed 16-bit LE PCM → Sarvam realtime "linear16"
+          languageCode: env.elevenlabs.sttLanguage || '',
+          model: env.elevenlabs.sttModel,
+          // Exotel Voicebot: raw/slin = signed 16-bit LE PCM → ElevenLabs "pcm_8000"
           encoding: 'linear16',
           sampleRate,
           streamType: 'fast',
@@ -335,7 +335,7 @@ function attachExotelMediaStreamServer(wss) {
       }
 
       stt.ws.on('open', () => {
-        console.log(`[EXOTEL] Sarvam STT connected conversationId=${conversationId}`);
+        console.log(`[EXOTEL] ElevenLabs STT connected conversationId=${conversationId}`);
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
         }, 20000);
@@ -349,14 +349,14 @@ function attachExotelMediaStreamServer(wss) {
           return;
         }
 
-        const eventName = message.event || message.type;
+        const eventName = message.event || message.type || message.message_type;
 
         if (eventName === 'vad.speech_start') {
           // Inbound audio is muted while botSpeaking, so ignore VAD here.
           return;
         }
 
-        if (eventName === 'transcript.final') {
+        if (eventName === 'transcript.final' || eventName === 'committed_transcript') {
           const transcript = message.text || message.transcript || '';
           const detectedLanguage = message.language || message.language_code || null;
           handleFinalTranscript(transcript, detectedLanguage).catch((error) => {
@@ -367,7 +367,7 @@ function attachExotelMediaStreamServer(wss) {
 
         if (eventName === 'error') {
           console.error(
-            `[EXOTEL] Sarvam STT error code=${message.code || 'unknown'} fatal=${Boolean(
+            `[EXOTEL] ElevenLabs STT error code=${message.code || 'unknown'} fatal=${Boolean(
               message.is_fatal
             )} message=${message.message || message.error || JSON.stringify(message)}`
           );
@@ -378,11 +378,11 @@ function attachExotelMediaStreamServer(wss) {
       });
 
       stt.ws.on('error', (error) => {
-        console.error('[EXOTEL] Sarvam STT socket error:', error.message);
+        console.error('[EXOTEL] ElevenLabs STT socket error:', error.message);
       });
 
       stt.ws.on('close', () => {
-        console.log(`[EXOTEL] Sarvam STT closed conversationId=${conversationId}`);
+        console.log(`[EXOTEL] ElevenLabs STT closed conversationId=${conversationId}`);
       });
     };
 
