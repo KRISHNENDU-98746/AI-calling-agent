@@ -31,14 +31,12 @@ function createRealtimeSttConnection(options = {}) {
     encoding = 'mulaw',
     sampleRate = 8000,
     commitStrategy = 'vad',
-    vadSilenceThresholdSecs = 0.7,
   } = options;
 
   const params = new URLSearchParams({
     model_id: model,
     audio_format: normalizeAudioFormat(encoding, sampleRate),
     commit_strategy: commitStrategy,
-    vad_silence_threshold_secs: String(vadSilenceThresholdSecs),
   });
   if (languageCode && languageCode !== 'auto') params.set('language_code', languageCode.split('-')[0]);
 

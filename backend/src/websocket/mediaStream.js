@@ -65,6 +65,8 @@ function attachMediaStreamServer(wss) {
     let callSessionId = null;
     const pendingSttAudio = [];
     const MAX_PENDING_STT_CHUNKS = 150; // ~3 seconds of Twilio 20ms audio
+    let forwardedSttChunks = 0;
+    let sttMessageCount = 0;
 
     let appointmentData = {
       patientName: null,
@@ -96,6 +98,8 @@ function attachMediaStreamServer(wss) {
       if (!stt || !payload) return;
       if (stt.ws.readyState === WebSocket.OPEN) {
         stt.sendAudioBase64(payload);
+        forwardedSttChunks += 1;
+        if (forwardedSttChunks === 1) console.log(`[media-stream] First audio chunk sent to ElevenLabs STT conversationId=${conversationId}`);
         return;
       }
       if (stt.ws.readyState === WebSocket.CONNECTING) {
@@ -264,6 +268,10 @@ function attachMediaStreamServer(wss) {
         }
 
         const eventName = message.event || message.type || message.message_type;
+        sttMessageCount += 1;
+        if (eventName === 'session_started' || eventName === 'partial_transcript' || eventName === 'committed_transcript') {
+          console.log(`[media-stream] ElevenLabs STT event=${eventName} textLength=${String(message.text || '').length} count=${sttMessageCount}`);
+        }
 
         if (eventName === 'vad.speech_start') {
           // Barge-in: stop current agent audio when caller starts speaking
@@ -294,8 +302,8 @@ function attachMediaStreamServer(wss) {
         console.error('[media-stream] ElevenLabs STT socket error:', error.message);
       });
 
-      stt.ws.on('close', () => {
-        console.log(`[media-stream] ElevenLabs STT closed conversationId=${conversationId}`);
+      stt.ws.on('close', (code, reason) => {
+        console.log(`[media-stream] ElevenLabs STT closed conversationId=${conversationId} code=${code} reason=${String(reason || '').slice(0, 120)} chunks=${forwardedSttChunks} messages=${sttMessageCount}`);
       });
     };
 
