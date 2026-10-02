@@ -37,6 +37,7 @@ function createRealtimeSttConnection(options = {}) {
     model_id: model,
     audio_format: normalizeAudioFormat(encoding, sampleRate),
     commit_strategy: commitStrategy,
+    'xi-api-key': env.elevenlabs.apiKey,
   });
   if (languageCode && languageCode !== 'auto') params.set('language_code', languageCode.split('-')[0]);
 

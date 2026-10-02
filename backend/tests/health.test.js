@@ -8,6 +8,7 @@ process.env.PORT = process.env.PORT || '34567';
 process.env.NODE_ENV = 'test';
 
 const { server } = require('../src/server');
+const { updateClinicConfig, defaultConfig } = require('../src/services/clinicConfig');
 
 function listen() {
   return new Promise((resolve) => {
@@ -89,19 +90,26 @@ describe('Appointment Voice Agent backend', () => {
   });
 
   it('POST /voice returns valid TwiML with Media Stream', async () => {
-    const port = await listen();
-    const res = await request(
-      port,
-      'POST',
-      '/voice',
-      'CallSid=CAtest123&From=%2B919999999999&To=%2B911111111111'
-    );
+    // Force testMode so isClinicAvailable() returns true regardless of clock.
+    await updateClinicConfig({ testMode: true });
+    try {
+      const port = await listen();
+      const res = await request(
+        port,
+        'POST',
+        '/voice',
+        'CallSid=CAtest123&From=%2B919999999999&To=%2B911111111111'
+      );
 
-    assert.equal(res.status, 200);
-    assert.match(res.headers['content-type'] || '', /xml/i);
-    assert.match(res.body, /<Connect>/i);
-    assert.match(res.body, /<Stream /i);
-    assert.match(res.body, /\/media-stream/i);
+      assert.equal(res.status, 200);
+      assert.match(res.headers['content-type'] || '', /xml/i);
+      assert.match(res.body, /<Connect>/i);
+      assert.match(res.body, /<Stream /i);
+      assert.match(res.body, /\/media-stream/i);
+    } finally {
+      // Restore default so subsequent tests are not affected.
+      await updateClinicConfig({ testMode: defaultConfig.testMode });
+    }
   });
 
   it('POST /exotel returns Exotel Voicebot WSS url JSON', async () => {
