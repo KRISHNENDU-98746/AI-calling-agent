@@ -54,11 +54,12 @@ function createRealtimeSttConnection(options = {}) {
     encoding: params.get('audio_format'),
     sampleRate: Number(sampleRate) || 8000,
     sendAudioBase64(base64Audio) {
-      if (ws.readyState !== WebSocket.OPEN) return;
+      if (ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify({
         message_type: 'input_audio_chunk',
         audio_base_64: base64Audio,
       }));
+      return true;
     },
     ping() {
       if (ws.readyState === WebSocket.OPEN) ws.ping();

@@ -66,6 +66,8 @@ function attachMediaStreamServer(wss) {
     const pendingSttAudio = [];
     const MAX_PENDING_STT_CHUNKS = 150; // ~3 seconds of Twilio 20ms audio
     let forwardedSttChunks = 0;
+    let receivedTwilioMediaChunks = 0;
+    let bufferedSttChunks = 0;
     let sttMessageCount = 0;
 
     let appointmentData = {
@@ -97,13 +99,13 @@ function attachMediaStreamServer(wss) {
     const forwardAudioToStt = (payload) => {
       if (!stt || !payload) return;
       if (stt.ws.readyState === WebSocket.OPEN) {
-        stt.sendAudioBase64(payload);
-        forwardedSttChunks += 1;
+        if (stt.sendAudioBase64(payload)) forwardedSttChunks += 1;
         if (forwardedSttChunks === 1) console.log(`[media-stream] First audio chunk sent to ElevenLabs STT conversationId=${conversationId}`);
         return;
       }
       if (stt.ws.readyState === WebSocket.CONNECTING) {
         pendingSttAudio.push(payload);
+        bufferedSttChunks += 1;
         if (pendingSttAudio.length > MAX_PENDING_STT_CHUNKS) pendingSttAudio.shift();
       }
     };
@@ -253,7 +255,9 @@ function attachMediaStreamServer(wss) {
 
       stt.ws.on('open', () => {
         console.log(`[media-stream] ElevenLabs STT connected conversationId=${conversationId}`);
-        while (pendingSttAudio.length) stt.sendAudioBase64(pendingSttAudio.shift());
+        while (pendingSttAudio.length) {
+          if (stt.sendAudioBase64(pendingSttAudio.shift())) forwardedSttChunks += 1;
+        }
         pingTimer = setInterval(() => {
           if (stt) stt.ping();
         }, 20000);
@@ -269,6 +273,7 @@ function attachMediaStreamServer(wss) {
 
         const eventName = message.event || message.type || message.message_type;
         sttMessageCount += 1;
+        if (sttMessageCount === 1) console.log(`[media-stream] ElevenLabs STT first message type=${eventName || 'unknown'}`);
         if (eventName === 'session_started' || eventName === 'partial_transcript' || eventName === 'committed_transcript') {
           console.log(`[media-stream] ElevenLabs STT event=${eventName} textLength=${String(message.text || '').length} count=${sttMessageCount}`);
         }
@@ -303,7 +308,7 @@ function attachMediaStreamServer(wss) {
       });
 
       stt.ws.on('close', (code, reason) => {
-        console.log(`[media-stream] ElevenLabs STT closed conversationId=${conversationId} code=${code} reason=${String(reason || '').slice(0, 120)} chunks=${forwardedSttChunks} messages=${sttMessageCount}`);
+        console.log(`[media-stream] ElevenLabs STT closed conversationId=${conversationId} code=${code} reason=${String(reason || '').slice(0, 120)} twilioChunks=${receivedTwilioMediaChunks} buffered=${bufferedSttChunks} sent=${forwardedSttChunks} messages=${sttMessageCount}`);
       });
     };
 
@@ -358,6 +363,7 @@ function attachMediaStreamServer(wss) {
         case 'media': {
           // Buffer the first chunks while ElevenLabs' realtime socket is connecting;
           // otherwise a caller who says their name immediately can be missed.
+          if (msg.media?.payload) receivedTwilioMediaChunks += 1;
           if (stt && msg.media?.payload) forwardAudioToStt(msg.media.payload);
           break;
         }
