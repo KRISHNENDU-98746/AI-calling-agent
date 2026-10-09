@@ -1,4 +1,4 @@
-const API_BASE = 'https://doctor-34h2.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://doctor-34h2.onrender.com';
 const API_KEY = localStorage.getItem('careflow_admin_api_key') || '';
 const demoAppointments = [
   { time: '09:30', period: 'AM', name: 'Nusrat Jahan', type: 'Follow-up visit', initials: 'NJ', status: 'Checked in' },
@@ -79,3 +79,29 @@ document.querySelector('#newAppointment').addEventListener('click', () => showTo
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', (event) => { document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active')); event.currentTarget.classList.add('active'); }));
 loadDashboard();
 setInterval(() => { if (currentConfig) applyConfig(currentConfig); }, 60 * 1000);
+
+document.querySelector('#testModeToggle').addEventListener('click', () => {
+  const localTest = document.querySelector('#localAudioTest');
+  localTest.style.display = localTest.style.display === 'none' ? 'block' : 'none';
+});
+
+document.querySelector('#simulateCallBtn').addEventListener('click', async () => {
+  const fileInput = document.querySelector('#audioUpload');
+  if (!fileInput.files.length) return showToast('Please select an audio file first');
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1];
+    showToast('Transcribing and processing...');
+    try {
+      const data = await api('/admin/simulate', {
+        method: 'POST',
+        body: JSON.stringify({ audioBase64: base64, mimeType: file.type || 'audio/wav' })
+      });
+      showToast(`User: ${data.transcript} | Agent: ${data.agentResponse}`);
+    } catch (e) {
+      showToast('Error simulating call');
+    }
+  };
+  reader.readAsDataURL(file);
+});

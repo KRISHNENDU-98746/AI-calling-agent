@@ -77,6 +77,8 @@ const env = {
     baseUrl: 'https://api.sarvam.ai',
     sttLanguage: process.env.SARVAM_STT_LANGUAGE || 'auto',
     sttMode: process.env.SARVAM_STT_MODE || 'codemix',
+    sttModel: process.env.SARVAM_STT_MODEL || 'saaras:v4',
+    sttRealtimeModel: process.env.SARVAM_STT_REALTIME_MODEL || 'saaras:v4-realtime',
     ttsLanguage: process.env.SARVAM_TTS_LANGUAGE || 'bn-IN',
     ttsSpeaker: process.env.SARVAM_TTS_SPEAKER || 'shubh',
     ttsModel: process.env.SARVAM_TTS_MODEL || 'bulbul:v3',
@@ -90,6 +92,12 @@ const env = {
     sttLanguage: process.env.ELEVENLABS_STT_LANGUAGE || '',
     baseUrl: (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/$/, ''),
     sttBaseUrl: (process.env.ELEVENLABS_STT_BASE_URL || 'wss://api.elevenlabs.io').replace(/\/$/, ''),
+  },
+
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    // Model used for Bengali STT — must support OpenAI audio/transcriptions endpoint.
+    whisperModel: process.env.OPENROUTER_WHISPER_MODEL || 'openai/whisper',
   },
 
   firebase: {

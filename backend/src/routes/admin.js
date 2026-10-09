@@ -25,4 +25,39 @@ router.patch('/admin/config', guard, async (req, res, next) => {
 router.get('/admin/appointments', guard, async (_req, res, next) => {
   try { return res.json({ appointments: await getAppointments() }); } catch (error) { return next(error); }
 });
+
+const { speechToText } = require('../services/sarvam');
+const { processConversationTurn, STEPS, EMPTY_APPOINTMENT } = require('../services/conversation');
+const conversations = new Map();
+
+router.post('/admin/simulate', guard, express.json({limit: '10mb'}), async (req, res, next) => {
+  try {
+    const { audioBase64, mimeType, conversationId = 'local-test' } = req.body;
+    if (!audioBase64) return res.status(400).json({ error: 'Audio required' });
+    
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    
+    // Transcribe
+    const stt = await speechToText(audioBuffer, { mimeType });
+    const text = stt.transcript;
+    
+    // Process conversation
+    const previous = conversations.get(conversationId) || { step: STEPS.ASK_NAME, appointmentData: { ...EMPTY_APPOINTMENT } };
+    const turn = processConversationTurn({
+      userText: text,
+      detectedLanguage: stt.languageCode,
+      step: previous.step,
+      appointmentData: previous.appointmentData,
+      callerPhone: '+919999999999'
+    });
+    
+    conversations.set(conversationId, { step: turn.step, appointmentData: turn.appointmentData });
+    
+    return res.json({ transcript: text, agentResponse: turn.response, step: turn.step });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 module.exports = router;

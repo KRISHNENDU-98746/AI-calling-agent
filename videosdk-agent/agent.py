@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import urllib.request
+from pathlib import Path
 from typing import AsyncIterator, Optional, Union
 from wave import Error as WaveError
 import wave
@@ -31,8 +32,9 @@ from videosdk.agents import (
     TTS,
     WorkerJob,
 )
+from videosdk.agents.utils import generate_videosdk_token, resolve_videosdk_auth_token
 
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("doctor-videosdk-agent")
 
@@ -248,7 +250,36 @@ async def start_session(context: JobContext):
     llm._job_context = context
     pipeline = Pipeline(stt=stt, llm=llm, tts=tts)
     session = AgentSession(agent=agent, pipeline=pipeline)
-    await session.start(wait_for_participant=True, run_until_shutdown=True)
+
+    await context.connect()
+
+    shutdown_event = asyncio.Event()
+
+    def on_session_end(reason: str) -> None:
+        async def shutdown() -> None:
+            try:
+                await context.shutdown()
+            finally:
+                shutdown_event.set()
+
+        asyncio.create_task(shutdown())
+
+    context.room.setup_session_end_callback(on_session_end)
+
+    async def close_session() -> None:
+        await session.close()
+
+    context.add_shutdown_callback(close_session)
+
+    try:
+        participant_id = await context.wait_for_participant()
+        if participant_id is None:
+            return
+        await session.start()
+        await shutdown_event.wait()
+    finally:
+        if not shutdown_event.is_set():
+            await context.shutdown()
 
 
 def make_context() -> JobContext:
@@ -262,16 +293,35 @@ def make_context() -> JobContext:
 
 def main() -> None:
     require_config()
+    if os.getenv("VIDEOSDK_API_KEY") and os.getenv("VIDEOSDK_SECRET_KEY"):
+        auth_token = generate_videosdk_token()
+    else:
+        auth_token = resolve_videosdk_auth_token()
+    if not auth_token:
+        raise RuntimeError(
+            "Missing VideoSDK auth: set VIDEOSDK_AUTH_TOKEN or "
+            "VIDEOSDK_API_KEY and VIDEOSDK_SECRET_KEY"
+        )
+    print(
+        "VideoSDK auth diagnostics: "
+        f"api_key_present={bool(os.getenv('VIDEOSDK_API_KEY'))} "
+        f"secret_key_present={bool(os.getenv('VIDEOSDK_SECRET_KEY'))} "
+        f"auth_token_present={bool(os.getenv('VIDEOSDK_AUTH_TOKEN'))} "
+        f"generated_token_length={len(auth_token)}"
+    )
+    options = Options(
+        agent_id=AGENT_ID,
+        auth_token=auth_token,
+        register=True,
+        max_processes=int(os.getenv("VIDEOSDK_MAX_PROCESSES", "4")),
+        host=os.getenv("VIDEOSDK_WORKER_HOST", "0.0.0.0"),
+        port=int(os.getenv("VIDEOSDK_WORKER_PORT", "8081")),
+    )
+    print(f"VideoSDK auth diagnostics: options_auth_token_present={bool(options.auth_token)}")
     WorkerJob(
         entrypoint=start_session,
         jobctx=make_context,
-        options=Options(
-            agent_id=AGENT_ID,
-            register=True,
-            max_processes=int(os.getenv("VIDEOSDK_MAX_PROCESSES", "4")),
-            host=os.getenv("VIDEOSDK_WORKER_HOST", "0.0.0.0"),
-            port=int(os.getenv("VIDEOSDK_WORKER_PORT", "8081")),
-        ),
+        options=options,
     ).start()
 
 

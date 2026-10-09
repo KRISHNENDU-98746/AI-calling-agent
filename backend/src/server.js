@@ -26,7 +26,7 @@ app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || env.adminCorsOrigins.length === 0 || env.adminCorsOrigins.includes(origin)) return callback(null, true);
+      if (!origin || origin.startsWith('http://localhost') || env.adminCorsOrigins.length === 0 || env.adminCorsOrigins.includes(origin)) return callback(null, true);
       return callback(new Error('Origin not allowed'));
     },
   })
@@ -42,8 +42,8 @@ app.use(
   })
 );
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // Register API routes before the 404 handler.
 app.use(healthRouter);

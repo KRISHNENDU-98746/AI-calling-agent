@@ -27,7 +27,7 @@ async function speechToText(audioBuffer, options = {}) {
 
   const {
     languageCode = env.sarvam.sttLanguage === 'auto' ? undefined : env.sarvam.sttLanguage,
-    model = 'saaras:v3',
+    model = env.sarvam.sttModel || 'saaras:v2',
     mode = env.sarvam.sttMode,
     filename = 'audio.wav',
     mimeType = 'audio/wav',
@@ -113,12 +113,13 @@ async function textToSpeech(text, options = {}) {
 }
 
 /**
- * Open Sarvam realtime STT WebSocket (saaras:v3-realtime).
+ * Open Sarvam realtime STT WebSocket (saaras:v4-realtime).
  * Compatible with Twilio Media Streams: encoding=mulaw, sample_rate=8000.
  * Exotel/Edesy PCM: encoding=linear16 (raw signed 16-bit LE), sample_rate=8000|16000.
  *
  * Docs: https://docs.sarvam.ai/api/api-guides-tutorials/speech-to-text/realtime-streaming
  * Realtime encoding enum: linear16 | linear32 | mulaw | alaw (NOT legacy pcm_s16le).
+ * Model: saaras:v4-realtime (latest as of October 2026, succeeds v3-realtime).
  */
 const REALTIME_ENCODING_ALIASES = {
   linear16: 'linear16',
@@ -149,7 +150,7 @@ function createRealtimeSttConnection(options = {}) {
 
   const {
     languageCode = env.sarvam.sttLanguage || 'auto',
-    model = 'saaras:v3-realtime',
+    model = env.sarvam.sttRealtimeModel || 'saaras:v4-realtime',
     mode = env.sarvam.sttMode || 'codemix',
     streamType = 'fast',
     endpointing = 'vad',
